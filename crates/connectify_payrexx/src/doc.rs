@@ -1,13 +1,12 @@
 // File: crates/connectify_payrexx/src/doc.rs
-#![allow(dead_code)] // Allow dead code for doc functions
 
-#[cfg(feature = "openapi")]
+#![allow(dead_code)] // Allow dead code for doc functions
+#![cfg(feature = "openapi")]
+
 use utoipa::OpenApi;
-#[cfg(feature = "openapi")]
 use crate::logic::{CreateGatewayRequest, CreateGatewayResponse}; // Import schemas
 
 // Define a dummy function with the handler's attributes for utoipa
-#[cfg(feature = "openapi")]
 #[utoipa::path(
     post,
     path = "/api/payrexx/create-gateway",
@@ -21,8 +20,6 @@ use crate::logic::{CreateGatewayRequest, CreateGatewayResponse}; // Import schem
 )]
 fn doc_create_gateway_handler() {}
 
-
-#[cfg(feature = "openapi")]
 #[derive(OpenApi)]
 #[openapi(
     paths(

@@ -13,6 +13,14 @@ keywords = ["twilio", "video", "actix", "stripe", "payrexx"]
 categories = ["network-programming", "web-programming::http-server"]
 exclude = ["target/", ".env.*", "secrets/", ".git/"]
 
+[features]
+openapi = [
+    "dep:utoipa",
+    "utoipa/axum_extras",
+    "dep:utoipa-swagger-ui",
+    #    "utoipa/chrono_types_with_format",
+    "utoipa-swagger-ui/axum",
+]
 
 [lib]
 path = "src/lib.rs"
@@ -23,5 +31,7 @@ axum = { workspace = true }
 jsonwebtoken = "9"
 chrono = { version = "0.4", features = ["serde"] } # Ensure chrono is a direct dependency
 connectify-config = { path = "../connectify_config" }
+utoipa = { workspace = true, optional = true }
+utoipa-swagger-ui = { workspace = true, optional = true }
 
 

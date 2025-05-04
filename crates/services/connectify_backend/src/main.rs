@@ -1,6 +1,6 @@
 // File: services/connectify_backend/src/main.rs
 use axum::{routing::get, Router};
-use connectify_config::load_config;
+use connectify_config::{load_config, PayrexxConfig};
 use connectify_gcal::routes as gcal_routes;
 use connectify_payrexx::routes as payrexx_routes;
 use connectify_twilio::routes as twilio_routes;
@@ -35,10 +35,12 @@ async fn main() {
     );
 
     let mut app = api_router;
-
+/*
     #[cfg(feature = "openapi")]
     {
         use connectify_gcal::doc::GcalApiDoc;
+        use connectify_twilio::doc::TwilioApiDoc;
+        use connectify_payrexx::doc::PayrexxApiDoc;
         use utoipa::OpenApi;
 
         // Create the OpenAPI spec
@@ -57,8 +59,54 @@ async fn main() {
         use utoipa_swagger_ui::SwaggerUi;
 
         let swagger_router =
-            SwaggerUi::new("/api/docs/gcal").url("/api/api-docs/gcal.json", GcalApiDoc::openapi());
+            SwaggerUi::new("/api/docs/gcal")
+                .url("/api/api-docs/gcal.json", GcalApiDoc::openapi())
+                .url("/api/docs/twilio", TwilioApiDoc::openapi())
+                .url("/api/api-docs/payrexx.json", PayrexxApiDoc::openapi());
+
         app = app.merge(swagger_router);
+    }
+
+*/
+    // Conditionally add Swagger UI and JSON endpoint if openapi feature enabled
+    #[cfg(feature = "openapi")]
+    {
+        use utoipa::OpenApi;
+        use utoipa_swagger_ui::SwaggerUi;
+        use connectify_twilio::doc::TwilioApiDoc;
+        use connectify_gcal::doc::GcalApiDoc;
+        use connectify_payrexx::doc::PayrexxApiDoc;
+        use axum::response::Json;
+
+        // Define the Merged OpenAPI Documentation struct
+        #[derive(OpenApi)]
+        #[openapi(
+            info( title = "Connectify API", version = "0.1.0", description = "Connectify Service API Docs" ),
+            components(),
+            tags( (name = "Connectify", description = "Core service endpoints") ),
+            servers( (url = "/api", description = "Main API Prefix") )
+        )]
+        struct ApiDoc;
+
+        // Create the merged OpenAPI document
+        let mut openapi_doc = ApiDoc::openapi();
+        openapi_doc.merge(GcalApiDoc::openapi());
+        openapi_doc.merge(TwilioApiDoc::openapi());
+        openapi_doc.merge(PayrexxApiDoc::openapi());
+        println!("📖 Adding Swagger UI at /api/docs");
+
+        // Create the Swagger UI route, referencing the merged doc
+        let swagger_ui = SwaggerUi::new("/api/docs")
+            .url("/api/docs/openapi.json", openapi_doc.clone());
+
+        // Merge the Swagger UI into the main app router
+        app = app.merge(swagger_ui);
+
+        // Add a route to serve the generated OpenAPI JSON spec
+        // app = app.route(
+        //     "/api/docs/openapi.json",
+        //     get(|| async { Json(openapi_doc) }) // Handler returns the spec as JSON
+        // );
     }
 
     // Serve static files in dev mode

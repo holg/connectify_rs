@@ -2,7 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "openapi")]
+use utoipa::ToSchema; // , IntoParams};
 // --- General Server Config ---
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ServerConfig {
     pub host: String,
@@ -10,6 +13,7 @@ pub struct ServerConfig {
 }
 
 // --- Database Config ---
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DatabaseConfig {
     pub url: String, // e.g., DATABASE_URL loaded via APP_DATABASE__URL or DATABASE_URL
@@ -17,6 +21,7 @@ pub struct DatabaseConfig {
 
 // --- Twilio Config ---
 // Holds non-secret Twilio config. Secrets loaded directly from env vars.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TwilioConfig {
     pub account_sid: String, // Loaded via APP_TWILIO__ACCOUNT_SID or TWILIO_ACCOUNT_SID
@@ -27,6 +32,7 @@ pub struct TwilioConfig {
 
 // --- Stripe Config ---
 // Holds non-secret Stripe config. Secret key loaded directly from env var.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct StripeConfig {
     pub success_url: String, // Mandatory
@@ -39,6 +45,7 @@ pub struct StripeConfig {
 
 // --- Payrexx Config ---
 // Holds non-secret Payrexx config. Secret key loaded directly from env var.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PayrexxConfig {
     pub instance_name: String, // Mandatory
@@ -53,6 +60,7 @@ pub struct PayrexxConfig {
 
 // --- Calendly Config ---
 // Holds non-secret Calendly config. Secrets/Keys loaded directly from env vars.
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CalendlyConfig {
     pub client_id: String, // Mandatory
@@ -64,6 +72,7 @@ pub struct CalendlyConfig {
 }
 
 // --- Google Calendar Config ---
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct GcalConfig {
     // pub api_key: String, // Mandatory
@@ -76,6 +85,7 @@ pub struct GcalConfig {
 }
 
 // --- Unified App Configuration ---
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AppConfig {
     // Server config is mandatory

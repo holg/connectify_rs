@@ -1,5 +1,4 @@
 // --- File: crates/connectify_payrexx/src/handlers.rs ---
-
 use axum::{
     extract::{State},
     response::{Json},
@@ -17,16 +16,19 @@ use crate::logic::{
     // Removed non-existent HTTPP_CLIENT_REF
 };
 
+#[cfg(feature = "openapi")]
+use utoipa::ToSchema; //, IntoParams};
+
 // --- Define the specific state needed for Payrexx handlers ---
 // Contains only the AppConfig Arc, as the HTTP client is static in logic.rs
 #[derive(Clone)]
+// #[cfg_attr(feature = "openapi", derive(utoipa::IntoParams, utoipa::ToSchema))]
 pub struct PayrexxState {
     pub config: Arc<AppConfig>,
 }
 
 /// Axum handler to create a Payrexx payment gateway.
 #[axum::debug_handler]
-#[cfg_attr(feature = "openapi", utoipa::path( /* ... OpenAPI attributes ... */ ))]
 pub async fn create_gateway_handler(
     // Extract the Payrexx-specific state
     State(state): State<Arc<PayrexxState>>,

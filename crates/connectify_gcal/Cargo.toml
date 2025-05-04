@@ -18,13 +18,7 @@ openapi = [
 google-calendar3 = { version = "6.0", features = ["yup-oauth2"] }
 yup-oauth2 = { version = "12.1", default-features = false, features = ["hyper-rustls", "service_account", "ring"] }
 
-# Matching Hyper 1.0 stack
-#hyper = "1.0"
-#hyper-rustls = { version = "0.24" }
-#http = "1.0"
 hyper-util = { version = "0.1.11", features = ["client-legacy", "tokio"] }
-http-body-util = "0.1"
-bytes = "1.5"
 
 # Your workspace dependencies
 tracing = { workspace = true }
@@ -32,7 +26,6 @@ axum = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 chrono = { workspace = true }
-tokio = { workspace = true }
 serde_json = { workspace = true }
 connectify-config = { path = "../connectify_config" }
 utoipa = { workspace = true, optional = true }

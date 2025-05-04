@@ -36,14 +36,17 @@ struct Claims {
     grants: Grants,
 }
 
-#[derive(Deserialize, Debug)] // Added Debug
+#[derive(Deserialize, Debug)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams, utoipa::ToSchema))]
 pub struct TokenRequestQuery {
     pub identity: String,
     #[serde(rename = "roomName")]
     pub room_name: String,
 }
 
-#[derive(Serialize, Debug)] // Added Debug
+#[derive(Serialize, Debug)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams, utoipa::ToSchema))]
+// Added Debug
 pub struct TokenResponse {
     pub token: String,
 }

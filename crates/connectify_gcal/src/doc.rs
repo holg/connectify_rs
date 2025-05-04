@@ -1,10 +1,11 @@
 // File: crates/connectify_gcal/src/doc.rs
-#![allow(dead_code)]
-use crate::logic::BookedEventsResponse;
-#[cfg(feature = "openapi")]
-use utoipa::OpenApi;
 
-#[cfg(feature = "openapi")]
+#![allow(dead_code)]
+#![cfg(feature = "openapi")]
+use crate::logic::BookedEventsResponse;
+use utoipa::OpenApi;
+use utoipa;
+
 use crate::logic::{
     AvailabilityQuery, AvailableSlotsResponse, BookSlotRequest, BookedEvent, BookedEventsQuery,
     BookingResponse, CancelBookingRequest, CancellationResponse,
@@ -24,7 +25,6 @@ use crate::logic::{
 )]
 fn doc_get_availability_handler() {}
 
-#[cfg(feature = "openapi")]
 #[utoipa::path(
     post,
     path = "/book",
@@ -60,7 +60,6 @@ fn doc_get_availability_handler() {}
 )]
 fn doc_book_slot_handler() {}
 
-#[cfg(feature = "openapi")]
 #[utoipa::path(
     delete,
     path = "/delete/{event_id}",
@@ -91,7 +90,6 @@ fn doc_book_slot_handler() {}
 )]
 fn doc_cancel_booking_handler() {}
 
-#[cfg(feature = "openapi")]
 #[utoipa::path(
     get,
     path = "/bookings",
@@ -127,7 +125,6 @@ fn doc_cancel_booking_handler() {}
 )]
 fn doc_get_booked_events_handler() {}
 
-#[cfg(feature = "openapi")]
 #[utoipa::path(
     patch,
     path = "/mark_cancelled/{event_id}",
@@ -158,7 +155,6 @@ fn doc_get_booked_events_handler() {}
 )]
 fn doc_mark_booking_cancelled_handler() {}
 
-#[cfg(feature = "openapi")]
 #[derive(OpenApi)]
 #[openapi(
     paths(

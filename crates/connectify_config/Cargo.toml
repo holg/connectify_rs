@@ -5,12 +5,12 @@ edition = "2021"
 [features]
 openapi = [
     "dep:utoipa",
-    "dep:utoipa-swagger-ui",
+#    "dep:utoipa-swagger-ui",
 ]
 [dependencies]
 serde = { workspace = true }
 utoipa = { workspace = true, optional = true }
 utoipa-swagger-ui = { workspace = true, optional = true }
-config = "0.15"
-dotenv = "0.15"
-once_cell = "1.21"
+config = { workspace = true }
+dotenv = { workspace = true }
+once_cell = { workspace = true }

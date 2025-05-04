@@ -380,17 +380,14 @@ name = "connectify-gcal"
 version = "0.1.0"
 dependencies = [
  "axum",
- "bytes",
  "chrono",
  "connectify-config",
  "google-calendar3",
- "http-body-util",
  "hyper-util",
  "mockall",
  "serde",
  "serde_json",
  "thiserror",
- "tokio",
  "tracing",
  "utoipa",
  "utoipa-swagger-ui",
@@ -426,6 +423,8 @@ dependencies = [
  "connectify-config",
  "jsonwebtoken",
  "serde",
+ "utoipa",
+ "utoipa-swagger-ui",
 ]
 
 [[package]]
