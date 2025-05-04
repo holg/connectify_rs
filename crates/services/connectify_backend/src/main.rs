@@ -1,16 +1,16 @@
 // File: services/connectify_backend/src/main.rs
-use axum::{extract::State, response::Json, routing::get, Router};
-use connectify_config::{load_config, AppConfig};
+use axum::{routing::get, Router};
+use connectify_config::{load_config};
 use connectify_gcal::routes as gcal_routes;
 use connectify_twilio::routes as twilio_routes;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
-#[axum::debug_handler]
-async fn show_config(State(config): State<Arc<AppConfig>>) -> Json<AppConfig> {
-    Json(config.as_ref().clone())
-}
+// #[axum::debug_handler]
+// async fn show_config(State(config): State<Arc<AppConfig>>) -> Json<AppConfig> {
+//     Json(config.as_ref().clone())
+// }
 
 #[tokio::main]
 async fn main() {
