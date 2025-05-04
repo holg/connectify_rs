@@ -7,7 +7,7 @@ members = [
 #    "crates/connectify_calendly",
     "crates/connectify_gcal",
     "crates/connectify_common",
-#    "crates/connectify_payrexx"
+    "crates/connectify_payrexx"
 ]
 resolver = "2"  # required for clean feature resolution across crates
 

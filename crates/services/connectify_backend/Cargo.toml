@@ -26,5 +26,6 @@ connectify-config = { path = "../../connectify_config" }
 connectify-twilio = { path = "../../connectify_twilio" }
 connectify-gcal = { path = "../../connectify_gcal" }
 connectify-common = { path = "../../connectify_common" }
+connectify-payrexx = { path = "../../connectify_payrexx" }
 utoipa = { workspace = true, optional = true }
 utoipa-swagger-ui = { workspace = true, optional = true }

@@ -1,7 +1,8 @@
 // File: services/connectify_backend/src/main.rs
 use axum::{routing::get, Router};
-use connectify_config::{load_config};
+use connectify_config::load_config;
 use connectify_gcal::routes as gcal_routes;
+use connectify_payrexx::routes as payrexx_routes;
 use connectify_twilio::routes as twilio_routes;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -22,9 +23,16 @@ async fn main() {
         .with_state(config.clone());
 
     let twilio_router = twilio_routes::routes(config.clone()); // Or whatever function provides the Router
+    let payrexx_router = payrexx_routes::routes(config.clone()); // Or whatever function provides the Router
     let gcal_router = gcal_routes::routes(config.clone()).await; // Or whatever function provides the Router
                                                                  // Combine all API routes and nest them under /api
-    let api_router = Router::new().nest("/api", api_router.merge(twilio_router).merge(gcal_router));
+    let api_router = Router::new().nest(
+        "/api",
+        api_router
+            .merge(twilio_router)
+            .merge(gcal_router)
+            .merge(payrexx_router),
+    );
 
     let mut app = api_router;
 

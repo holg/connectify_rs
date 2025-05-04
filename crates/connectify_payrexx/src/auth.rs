@@ -1,39 +1,75 @@
-use connectify_config::GcalConfig;
-use google_calendar3::{
-    hyper_rustls::{self, HttpsConnectorBuilder},
-    hyper_util::client::legacy::connect::HttpConnector,
-    hyper_util::client::legacy::Client,
-    yup_oauth2::{read_service_account_key, ServiceAccountAuthenticator},
-    CalendarHub,
-};
-use std::{error::Error, path::Path};
+// --- File: crates/connectify_payrexx/src/auth.rs ---
 
-// Type aliases for clarity
-type Connector = hyper_rustls::HttpsConnector<HttpConnector>;
-pub type HubType = CalendarHub<Connector>;
+// use axum::{
+//     extract::{State}, // Use State extractor
+//     response::{Json},
+//     http::StatusCode,
+// };
 
-pub async fn create_calendar_hub(
-    config: &GcalConfig,
-) -> Result<HubType, Box<dyn Error + Send + Sync>> {
-    let key_path = config
-        .key_path
-        .as_deref()
-        .ok_or("Missing key_path in GcalConfig")?;
+// use std::sync::Arc;
+// use connectify_config::AppConfig; // Use the unified config from the config crate
+// use crate::logic::{
+//     create_gateway_request, CreateGatewayRequest, CreateGatewayResponse, PayrexxError // Import logic function and types
+// };
 
-    let sa_key = read_service_account_key(Path::new(key_path)).await?;
-
-    let auth = ServiceAccountAuthenticator::builder(sa_key).build().await?;
-
-    let https = HttpsConnectorBuilder::new()
-        .with_native_roots()?
-        .https_or_http()
-        .enable_http1()
-        .build();
-
-    // Create client without specifying body type
-    let client = Client::builder(hyper_util::rt::TokioExecutor::new()).build(https);
-
-    let hub = CalendarHub::new(client, auth);
-
-    Ok(hub)
-}
+// Define the shared application state struct expected by this handler
+// This should match the AppState defined in connectify_backend/src/main.rs
+// Or you can extract fields directly if AppState is guaranteed to contain them.
+// For simplicity, let's assume AppState is passed directly.
+// Ensure AppState derives Clone.
+// use crate::AppState; // Assuming AppState is defined in a shared location or backend
+//
+// /// Axum handler to create a Payrexx payment gateway.
+// #[axum::debug_handler] // Add debug handler for better error messages during development
+// #[cfg_attr(feature = "openapi", utoipa::path( // Keep OpenAPI docs if using that feature
+//     post,
+//     path = "/api/payrexx/create-gateway",
+//     request_body = CreateGatewayRequest,
+//     responses(
+//         (status = 200, description = "Gateway created successfully", body = CreateGatewayResponse),
+//         (status = 400, description = "Bad request (e.g., invalid input)"),
+//         (status = 500, description = "Internal server error or Payrexx API error")
+//     ),
+//     tag = "Payrexx"
+// ))]
+// pub async fn create_gateway_handler(
+//     // Extract the full shared AppState
+//     State(app_state): State<Arc<AppConfig>>, // Assuming AppConfig is the top-level state for now
+//     // If using a nested AppState: State(state): State<Arc<AppState>>,
+//     Json(payload): Json<CreateGatewayRequest>, // Extract JSON body
+// ) -> Result<Json<CreateGatewayResponse>, (StatusCode, String)> {
+//
+//     // Check the runtime flag from the shared config
+//     if !app_state.use_payrexx {
+//         return Err((StatusCode::SERVICE_UNAVAILABLE, "Payrexx service is disabled.".to_string()));
+//     }
+//
+//     if let Some(payrexx_config) = app_state.payrexx.as_ref() {
+//         match create_gateway_request(payrexx_config, payload).await {
+//             Ok(response) => Ok(Json(response)), // Return 200 OK with JSON body
+//             Err(PayrexxError::ConfigError) => {
+//                 Err((StatusCode::INTERNAL_SERVER_ERROR, "Payrexx configuration error on server.".to_string()))
+//             }
+//             Err(PayrexxError::RequestError(e)) => {
+//                 eprintln!("Payrexx Reqwest Error: {}", e);
+//                 Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to communicate with payment provider.".to_string()))
+//             }
+//             Err(PayrexxError::ParseError(e)) => {
+//                 eprintln!("Payrexx Parse Error: {}", e);
+//                 Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to understand payment provider response.".to_string()))
+//             }
+//             Err(PayrexxError::ApiError { status, message }) => {
+//                 // Could potentially map specific Payrexx errors to different HTTP statuses if needed
+//                 Err((StatusCode::BAD_GATEWAY, format!("Payment provider error: {} - {}", status, message)))
+//             }
+//             Err(PayrexxError::InternalError(msg)) => {
+//                 Err((StatusCode::INTERNAL_SERVER_ERROR, msg))
+//             }
+//         }
+//
+//     } else {
+//         // This case means use_payrexx was true, but config loading failed earlier
+//         Err((StatusCode::INTERNAL_SERVER_ERROR, "Payrexx configuration error (details missing).".to_string()))
+//     }
+// }
+//

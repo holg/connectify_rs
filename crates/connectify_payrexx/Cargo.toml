@@ -1,0 +1,44 @@
+# --- File: crates/connectify_payrexx/Cargo.toml ---
+
+[package]
+name = "connectify-payrexx"
+version = "0.1.0"
+edition = "2021"
+authors = ["Trahe Consult <trahe@mac.com>"]
+description = "Payrexx payment gateway integration for Connectify"
+license = "MIT OR Apache-2.0" # Choose appropriate license
+
+[features]
+# Keep openapi feature definition consistent if used across crates
+openapi = [
+    "dep:utoipa",
+    "utoipa/axum_extras",
+    "dep:utoipa-swagger-ui",
+    "utoipa-swagger-ui/axum",
+]
+
+[dependencies]
+# --- Workspace Deps ---
+axum = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true } # For timestamps if needed
+thiserror = { workspace = true }
+connectify-config = { path = "../connectify_config" }
+tracing = { workspace = true }
+reqwest = {version = "0.12.15", features = ["json", "rustls-tls"]}
+once_cell = {workspace = true}
+# --- Crate Specific External Deps (if any) ---
+# None needed specifically for this basic Payrexx logic yet
+
+# --- OpenAPI Deps (Optional based on feature) ---
+utoipa = { workspace = true, optional = true }
+utoipa-swagger-ui = { workspace = true, optional = true }
+
+# http-body-util = "0.1" # Likely not needed directly here
+# bytes = "1.5" # Likely not needed directly here
+
+[dev-dependencies]
+mockall = "0.13.1" # Keep if you plan unit tests with mocking
+wiremock = "0.6" # Keep if you plan integration tests with mocking

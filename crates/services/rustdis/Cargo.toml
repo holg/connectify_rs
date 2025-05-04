@@ -1,0 +1,10 @@
+[package]
+name = "rustdis"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rustdis = {git = "git@github.com:holg/rustdis.git"}
+
+[lints]
+workspace = true
