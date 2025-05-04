@@ -1,0 +1,5 @@
+/target
+config/*
+!config/default.yml
+.DS_Store
+.idea

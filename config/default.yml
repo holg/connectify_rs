@@ -1,0 +1,41 @@
+server:
+  host: "127.0.0.1"
+  port: 8086
+use_twilio: true
+use_stripe: true
+use_payrexx: true
+
+database:
+  url: sqlite://example.db
+
+twilio:
+  account_sid: "ACxxx"
+  api_key_sid: "`api_key_sid`"
+  api_key_secret: "secret"
+  verify_service_sid: "VAxxx"
+
+stripe:
+  secret_key: "sk_test_xxx"
+  success_url: "https://example.com/api/stripe/success"
+  cancel_url: "https://example.com/api/stripe/cancel"
+
+payrexx:
+  api_key: "xxx"
+  secret_key: "xxx"
+  currency: "EUR"
+  instance_name: "My Payrexx Instance"
+  success_url: "https://example.com/api/payrexx/success"
+  failed_url: "https://example.com/api/payrexx/failed"
+  cancel_url: "https://example.com/api/payrexx/cancel"
+
+
+gcal:
+  client_id: "xxx"
+  client_secret: "xxx"
+  refresh_token: "xxx"
+  key_path: "./service_account_key.json"
+calendly:
+  client_id: "xxx"
+  client_secret: "xxx"
+  refresh_token: "xxx"
+  redirect_uri: "https://example.com/api/calendly/callback"

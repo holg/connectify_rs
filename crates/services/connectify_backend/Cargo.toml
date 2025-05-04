@@ -1,0 +1,30 @@
+[package]
+name = "connectify-backend"
+version = "0.1.0"
+edition = "2021"
+# connectify_backend/Cargo.toml
+[features]
+openapi = [
+    "dep:utoipa",
+    "dep:utoipa-swagger-ui",
+    "utoipa/axum_extras",
+    "utoipa-swagger-ui/axum",
+    "connectify-gcal/openapi",     # ✅ forward the feature
+]
+
+
+[dependencies]
+axum = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+http = { workspace = true }
+tower-http = { workspace = true }
+connectify-config = { path = "../../connectify_config" }
+connectify-twilio = { path = "../../connectify_twilio" }
+connectify-gcal = { path = "../../connectify_gcal" }
+connectify-common = { path = "../../connectify_common" }
+utoipa = { workspace = true, optional = true }
+utoipa-swagger-ui = { workspace = true, optional = true }

@@ -1,0 +1,41 @@
+[package]
+name = "connectify-gcal"
+version = "0.1.0"
+edition = "2021"
+authors = ["Trahe Consult <trahe@mac.com>"]
+description = "Google Calendar integration for Connectify"
+license = "MIT OR Apache-2.0"
+[features]
+openapi = [
+    "dep:utoipa",
+    "utoipa/axum_extras",
+    "dep:utoipa-swagger-ui",
+#    "utoipa/chrono_types_with_format",
+    "utoipa-swagger-ui/axum",
+]
+[dependencies]
+# Google Calendar
+google-calendar3 = { version = "6.0", features = ["yup-oauth2"] }
+yup-oauth2 = { version = "12.1", default-features = false, features = ["hyper-rustls", "service_account", "ring"] }
+
+# Matching Hyper 1.0 stack
+#hyper = "1.0"
+#hyper-rustls = { version = "0.24" }
+#http = "1.0"
+hyper-util = { version = "0.1.11", features = ["client-legacy", "tokio"] }
+http-body-util = "0.1"
+bytes = "1.5"
+
+# Your workspace dependencies
+tracing = { workspace = true }
+axum = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+connectify-config = { path = "../connectify_config" }
+utoipa = { workspace = true, optional = true }
+utoipa-swagger-ui = { workspace = true, optional = true }
+[dev-dependencies]
+mockall = "0.13.1"
