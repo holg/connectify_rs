@@ -4,12 +4,12 @@
 #![cfg(feature = "openapi")]
 
 use utoipa::OpenApi;
-use crate::logic::{CreateGatewayRequest, CreateGatewayResponse}; // Import schemas
+use crate::logic::{CreateGatewayRequest, CreateGatewayResponse, PayrexxWebhookPayload}; // Import schemas
 
 // Define a dummy function with the handler's attributes for utoipa
 #[utoipa::path(
     post,
-    path = "/api/payrexx/create-gateway",
+    path = "/payrexx/create-gateway",
     request_body = CreateGatewayRequest,
     responses(
         (status = 200, description = "Gateway created successfully", body = CreateGatewayResponse),
@@ -20,15 +20,36 @@ use crate::logic::{CreateGatewayRequest, CreateGatewayResponse}; // Import schem
 )]
 fn doc_create_gateway_handler() {}
 
+#[utoipa::path(
+    post,
+    path = "/payrexx/webhook",
+    // Describe the webhook payload structure Payrexx sends
+    request_body(content = PayrexxWebhookPayload, description = "Webhook payload sent by Payrexx", content_type = "application/json"),
+    responses(
+        // Payrexx typically expects a simple success/failure status code
+        (status = 200, description = "Webhook received and acknowledged successfully"),
+        (status = 400, description = "Bad Request (e.g., invalid signature, malformed payload)"),
+        (status = 500, description = "Internal Server Error (failed to process webhook)")
+        // Payrexx might ignore response body, so no body needed here usually
+    ),
+    tag = "Payrexx" // Group under the same tag
+)]
+fn doc_payrexx_webhook_handler() {}
+
+// --- Main OpenAPI Definition ---
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        doc_create_gateway_handler // Add the doc function here
+        // List all documented paths for this feature
+        doc_create_gateway_handler,
+        doc_payrexx_webhook_handler
     ),
     components(
-        schemas(CreateGatewayRequest, CreateGatewayResponse) // Add request/response schemas
+        // List all schemas used in the paths
+        schemas(CreateGatewayRequest, CreateGatewayResponse, PayrexxWebhookPayload)
     ),
     tags(
+        // Define the tag used above for grouping endpoints
         (name = "Payrexx", description = "Payrexx Payment Gateway API")
     )
 )]

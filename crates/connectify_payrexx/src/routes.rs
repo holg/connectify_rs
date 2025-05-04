@@ -8,7 +8,7 @@ use std::sync::Arc;
 use connectify_config::AppConfig; // Need AppConfig for state
 // Removed: use reqwest::Client; // No longer needed as parameter
 // Import the handler function and the specific state struct it needs
-use crate::handlers::{create_gateway_handler, PayrexxState};
+use crate::handlers::{create_gateway_handler, PayrexxState, payrexx_webhook_handler};
 
 /// Creates a router containing all routes for the Payrexx feature.
 /// Initializes and applies the necessary PayrexxState.
@@ -33,7 +33,8 @@ pub fn routes(
 
     Router::new()
         // Register the handler for creating a payment gateway
-        .route("/api/payrexx/create-gateway", post(create_gateway_handler))
+        .route("/payrexx/create-gateway", post(create_gateway_handler))
+        .route("/payrexx/webhook", post(payrexx_webhook_handler))
         // Add other Payrexx routes here later (e.g., webhook handler)
         .with_state(payrexx_state) // Apply the specific state to this router fragment
 }
