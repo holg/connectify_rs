@@ -1,4 +1,3 @@
-// File: crates/connectify_gcal/src/auth.rs
 use connectify_config::GcalConfig;
 use google_calendar3::{
     hyper_rustls::{self, HttpsConnectorBuilder},

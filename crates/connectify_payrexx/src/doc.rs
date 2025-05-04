@@ -1,4 +1,4 @@
-// File: crates/connectify_gcal/src/doc.rs
+// File: crates/connectify_calendly/src/doc.rs
 #![allow(dead_code)]
 use crate::logic::BookedEventsResponse;
 #[cfg(feature = "openapi")]
