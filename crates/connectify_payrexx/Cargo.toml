@@ -27,8 +27,12 @@ chrono = { workspace = true } # For timestamps if needed
 thiserror = { workspace = true }
 connectify-config = { path = "../connectify_config" }
 tracing = { workspace = true }
-reqwest = {version = "0.12.15", features = ["json", "rustls-tls"]}
+reqwest = {workspace = true}
 once_cell = {workspace = true}
+hmac = {workspace = true}
+sha2 = {workspace = true}
+base64 = {workspace = true}
+serde_urlencoded = {workspace = true}
 # --- Crate Specific External Deps (if any) ---
 # None needed specifically for this basic Payrexx logic yet
 

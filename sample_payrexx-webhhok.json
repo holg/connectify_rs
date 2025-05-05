@@ -1,0 +1,99 @@
+{
+    "transaction": {
+        "id": 1,
+        "psp": "",
+        "lang": "de",
+        "mode": "TEST",
+        "time": "2025-04-01 12:00:08",
+        "type": "E-Commerce",
+        "uuid": null,
+        "pspId": 1,
+        "amount": 10000,
+        "status": "confirmed",
+        "contact": {
+            "id": null,
+            "zip": "1234",
+            "uuid": null,
+            "email": "example@example.com",
+            "phone": "+41 12345678",
+            "place": "Testhausen",
+            "title": "2",
+            "street": "Teststiege 123",
+            "company": "Some Group GmbH",
+            "country": "Schweiz",
+            "lastname": "Mustermann",
+            "firstname": "Max",
+            "countryISO": "CH",
+            "delivery_zip": "",
+            "date_of_birth": "01.01.1970",
+            "delivery_place": "",
+            "delivery_title": "",
+            "delivery_street": "",
+            "delivery_company": "",
+            "delivery_country": "",
+            "delivery_lastname": "",
+            "delivery_firstname": "",
+            "delivery_countryISO": ""
+        },
+        "invoice": {
+            "test": 1,
+            "number": "123456",
+            "currency": "CHF",
+            "discount": {
+                "code": null,
+                "amount": 0,
+                "percentage": null
+            },
+            "products": [
+                {
+                    "sku": null,
+                    "name": "123456",
+                    "price": 100,
+                    "vatRate": null,
+                    "quantity": 1,
+                    "description": null
+                }
+            ],
+            "paymentLink": null,
+            "referenceId": null,
+            "custom_fields": [
+                {
+                    "name": "Hobby",
+                    "type": "text",
+                    "value": "Rust tinkern"
+                }
+            ],
+            "originalAmount": 10000,
+            "refundedAmount": 0,
+            "shippingAmount": null,
+            "paymentRequestId": null,
+            "googleAnalyticProducts": [
+                {
+                    "price": 1,
+                    "item_id": null,
+                    "quantity": 1,
+                    "item_name": "123456"
+                }
+            ]
+        },
+        "payment": {
+            "brand": null,
+            "wallet": null,
+            "purchaseOnInvoiceInformation": null
+        },
+        "instance": {
+            "name": "testapp",
+            "uuid": "0a1af0c1"
+        },
+        "metadata": {},
+        "pageUuid": null,
+        "payoutUuid": null,
+        "payrexxFee": 0,
+        "refundable": false,
+        "referenceId": null,
+        "subscription": null,
+        "posSerialNumber": "",
+        "posTerminalName": "",
+        "partiallyRefundable": false
+    }
+}
