@@ -1,0 +1,42 @@
+# --- File: crates/connectify_stripe/Cargo.toml ---
+
+[package]
+name = "connectify-stripe"
+version = "0.1.0"
+edition = "2021"
+authors = ["Trahe Consult <trahe@mac.com>"] # Using author from your Payrexx example
+description = "Stripe payment integration for Connectify"
+license = "MIT OR Apache-2.0" # Choose appropriate license
+
+[features]
+# Keep openapi feature definition consistent if used across crates
+openapi = [
+    "dep:utoipa",
+    "utoipa/axum_extras",
+    "dep:utoipa-swagger-ui",
+    "utoipa-swagger-ui/axum",
+]
+
+[dependencies]
+# --- Workspace Deps ---
+axum = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+connectify-config = { path = "../connectify_config" }
+tracing = { workspace = true }
+reqwest = { workspace = true } # For making API calls
+once_cell = { workspace = true } # For static HTTP client
+hmac = { workspace = true } # For HMAC-SHA256
+sha2 = { workspace = true } # For HMAC-SHA256
+hex = {workspace = true}
+
+# --- OpenAPI Deps (Optional based on feature) ---
+utoipa = { workspace = true, optional = true }
+utoipa-swagger-ui = { workspace = true, optional = true }
+
+
+[dev-dependencies]
+# mockall = "0.13.1"
+# wiremock = "0.6"

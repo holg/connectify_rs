@@ -10,8 +10,23 @@ openapi = [
     "utoipa/axum_extras",
     "utoipa-swagger-ui/axum",
     "connectify-gcal/openapi",     # ✅ forward the feature
-    "connectify-twilio/openapi",     # ✅ forward the feature
-    "connectify-payrexx/openapi",     # ✅ forward the feature
+]
+payrexx = [
+    "connectify-payrexx",
+    "connectify-payrexx/openapi", # ✅ forward the feature
+]
+stripe = [
+    "connectify-stripe",
+    "connectify-stripe/openapi", # ✅ forward the feature
+]
+
+twilio = [
+    "connectify-twilio",
+    "connectify-twilio/openapi", # ✅ forward the feature
+]
+gcal = [
+    "connectify-gcal",
+    "connectify-gcal/openapi", # ✅ forward the feature
 ]
 
 
@@ -25,9 +40,10 @@ tracing-subscriber = { workspace = true }
 http = { workspace = true }
 tower-http = { workspace = true }
 connectify-config = { path = "../../connectify_config" }
-connectify-twilio = { path = "../../connectify_twilio" }
-connectify-gcal = { path = "../../connectify_gcal" }
+connectify-twilio = { path = "../../connectify_twilio", optional = true }
+connectify-gcal = { path = "../../connectify_gcal", optional = true }
 connectify-common = { path = "../../connectify_common" }
-connectify-payrexx = { path = "../../connectify_payrexx" }
+connectify-payrexx = { path = "../../connectify_payrexx", optional = true }
+connectify-stripe = { path = "../../connectify_stripe", optional = true }
 utoipa = { workspace = true, optional = true }
 utoipa-swagger-ui = { workspace = true, optional = true }

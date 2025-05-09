@@ -342,6 +342,7 @@ dependencies = [
  "connectify-config",
  "connectify-gcal",
  "connectify-payrexx",
+ "connectify-stripe",
  "connectify-twilio",
  "http",
  "serde",
@@ -416,6 +417,26 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "wiremock",
+]
+
+[[package]]
+name = "connectify-stripe"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "connectify-config",
+ "hex",
+ "hmac",
+ "once_cell",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "utoipa-swagger-ui",
 ]
 
 [[package]]

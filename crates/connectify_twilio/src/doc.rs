@@ -32,7 +32,6 @@ fn doc_generate_token() {
     // This function body is never executed, it's just an anchor for the macro.
 }
 
-
 // Define the main OpenAPI documentation structure for this crate/feature
 #[derive(OpenApi)]
 #[openapi(

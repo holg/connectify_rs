@@ -2,8 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "openapi")]
-use utoipa::ToSchema; // , IntoParams};
+// #[cfg(feature = "openapi")]
+// use utoipa::ToSchema; // , IntoParams};
 // --- General Server Config ---
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]

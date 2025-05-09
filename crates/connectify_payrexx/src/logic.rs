@@ -1,5 +1,5 @@
 // --- File: crates/connectify_payrexx/src/logic.rs ---
-
+#![allow(dead_code)] // Allow dead code for doc functions as long as they are not used, bcs of WIP
 use chrono::Utc;
 use connectify_config::PayrexxConfig; // Use config types from connectify_config
 use once_cell::sync::Lazy;
@@ -15,7 +15,6 @@ use sha2::Sha256;
 
 // URL encoding import
 use serde_urlencoded;
-
 // Conditionally import ToSchema if openapi feature is enabled
 #[cfg(feature = "openapi")]
 use utoipa::ToSchema;
