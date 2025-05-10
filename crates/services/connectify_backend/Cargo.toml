@@ -28,7 +28,11 @@ gcal = [
     "connectify-gcal",
     "connectify-gcal/openapi", # ✅ forward the feature
 ]
-
+fulfillment = [
+    "connectify-fulfillment",
+    "connectify-fulfillment/openapi", # ✅ forward the feature
+]
+gcal_fulfillment = ["connectify-gcal", "connectify-fulfillment", "connectify-fulfillment/gcal"]
 
 [dependencies]
 axum = { workspace = true }
@@ -45,5 +49,6 @@ connectify-gcal = { path = "../../connectify_gcal", optional = true }
 connectify-common = { path = "../../connectify_common" }
 connectify-payrexx = { path = "../../connectify_payrexx", optional = true }
 connectify-stripe = { path = "../../connectify_stripe", optional = true }
+connectify-fulfillment = { path = "../../connectify_fulfillment", optional = true }
 utoipa = { workspace = true, optional = true }
 utoipa-swagger-ui = { workspace = true, optional = true }

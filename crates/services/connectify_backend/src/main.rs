@@ -1,65 +1,153 @@
 // File: services/connectify_backend/src/main.rs
 use axum::{routing::get, Router};
 use connectify_config::load_config;
+#[cfg(feature = "twilio")]
+use connectify_twilio;
 #[cfg(feature = "gcal")]
-use connectify_gcal::routes as gcal_routes;
-#[cfg(feature = "payrexx")]
-use connectify_payrexx::routes as payrexx_routes;
+use connectify_gcal::{self, routes as gcal_routes, handlers::GcalState, auth::create_calendar_hub};
 #[cfg(feature = "stripe")]
 use connectify_stripe::routes as stripe_routes;
-#[cfg(feature = "twilio")]
-use connectify_twilio::routes as twilio_routes;
+#[cfg(feature = "fulfillment")]
+use connectify_fulfillment::routes as fulfillment_routes;
+#[cfg(feature = "payrexx")]
+use connectify_payrexx::routes as payrexx_routes;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
 use connectify_config::AppConfig;
 use axum::{extract::State, Json};
-#[axum::debug_handler]
-async fn show_config(State(config): State<Arc<AppConfig>>) -> Json<AppConfig> {
-    Json(config.as_ref().clone())
+
+
+#[derive(Clone)]
+struct AppState {
+    config: Arc<AppConfig>,
+    #[cfg(feature = "gcal")]
+    gcal_state: Option<Arc<GcalState>>, // This state is specific to GCal routes
+    // Add other feature-specific states here if needed by their routes
+    // e.g., http_client for features that need a shared reqwest client
 }
+
+
+
+
+// #[axum::debug_handler]
+// async fn show_config(State(config): State<Arc<AppConfig>>) -> Json<AppConfig> {
+//     Json(config.as_ref().clone())
+// }
+
+
 
 #[tokio::main]
 async fn main() {
     let config = Arc::new(load_config().expect("Failed to load config"));
+    println!("✅ Configuration loaded.");
 
-    let api_router = Router::new()
-        .route("/", get(|| async { "Welcome to Connectify-Rs API!" }))
-        // .route("/config", get(show_config))
-        .with_state(config.clone());
-    #[cfg(feature = "twilio")]
-    let twilio_router = twilio_routes::routes(config.clone());
-    #[cfg(feature = "payrexx")]
-    let payrexx_router = payrexx_routes::routes(config.clone());
-    #[cfg(feature = "stripe")]
-    let stripe_router = stripe_routes::routes(config.clone());
+    // --- Initialize Feature-Specific State Conditionally ---
+    #[allow(unused_mut)] // GCal state might not be used if feature is off
+    let mut gcal_state_instance: Option<Arc<GcalState>> = None;
     #[cfg(feature = "gcal")]
-    let gcal_router = gcal_routes::routes(config.clone()).await;
-
-    let api_router = Router::new().nest("/api", {
-        #[allow(unused_mut)] // for the features it needs to be mutable
-        let mut router = api_router;
-        #[cfg(feature = "twilio")]
-        {
-            router = router.merge(twilio_router);
+    {
+        if config.use_gcal && config.gcal.is_some() {
+            println!("ℹ️ Initializing Google Calendar client...");
+            match create_calendar_hub(config.gcal.as_ref().unwrap()).await {
+                Ok(hub) => {
+                    gcal_state_instance = Some(Arc::new(GcalState {
+                        config: config.clone(),
+                        calendar_hub: Arc::new(hub),
+                    }));
+                    println!("✅ Google Calendar client initialized.");
+                }
+                Err(e) => {
+                    eprintln!("🚨 Failed to initialize Google Calendar client: {}. GCal routes disabled.", e);
+                }
+            }
+        } else {
+            println!("ℹ️ GCal feature compiled, but disabled via runtime config or missing gcal config section.");
         }
+    }
+
+    // Create the final AppState
+    let app_state = AppState {
+        config: config.clone(),
         #[cfg(feature = "gcal")]
-        {
-            router = router.merge(gcal_router);
-        }
-        #[cfg(feature = "stripe")]
-        {
-            router = router.merge(stripe_router);
-        }
-        #[cfg(feature = "payrexx")]
-        {
-            router = router.merge(payrexx_router);
-        }
-        router
-    });
+        gcal_state: gcal_state_instance.clone(),
+    };
 
-    let mut app = api_router;
+    let mut api_router = Router::new()
+        .route("/", get(|| async { "Welcome to Connectify-Rs API!" }));
+        // .route("/config", get(show_config))
+        // .with_state(config.clone()); we manage the State now with app_state
+    // Conditionally merge Twilio routes
+    #[cfg(feature = "twilio")]
+    {
+        if config.use_twilio && config.twilio.is_some() {
+            println!("🔌 Merging Twilio routes...");
+            // Twilio routes take Arc<AppConfig> as state
+            api_router = api_router.merge(connectify_twilio::routes::routes(config.clone()));
+        }
+    }
+    // Conditionally merge GCal routes
+    #[cfg(feature = "gcal")]
+    {
+        // GCal routes take Arc<GcalState> as state
+        if let Some(gcal_state_ref) = app_state.gcal_state.as_ref() { // Check if GcalState was initialized
+            if config.use_gcal && config.gcal.is_some() { // Also check runtime flags
+                println!("🔌 Merging GCal routes...");
+                api_router = api_router.merge(connectify_gcal::routes::routes(config.clone()).await);
+            }
+        } else if config.use_gcal && config.gcal.is_some() { // Log if enabled but state failed
+            println!("ℹ️ GCal routes not merged (GCal state initialization failed).");
+        }
+    }
+    // Conditionally merge Payrexx routes
+    #[cfg(feature = "payrexx")]
+    {
+        if config.use_payrexx && config.payrexx.is_some() {
+            println!("🔌 Merging Payrexx routes...");
+            // Payrexx routes take Arc<AppConfig> as state
+            api_router = api_router.merge(connectify_payrexx::routes(config.clone()));
+        }
+    }
+    // Conditionally merge Stripe routes
+    #[cfg(feature = "stripe")]
+    {
+        if config.use_stripe && config.stripe.is_some() {
+            println!("🔌 Merging Stripe routes...");
+            // Stripe routes take Arc<AppConfig> as state
+            api_router = api_router.merge(connectify_stripe::routes(config.clone()));
+        }
+    }
+    // Conditionally merge Fulfillment routes
+    #[cfg(feature = "fulfillment")]
+    {
+        if config.use_fulfillment && config.fulfillment.is_some() {
+            println!("🔌 Merging Fulfillment routes...");
+            // Fulfillment routes take Arc<AppConfig> and potentially other states like GcalState
+            #[cfg(not(feature = "gcal"))]
+            {
+                // When gcal feature is not enabled, call with just one argument
+                api_router = api_router.merge(connectify_fulfillment::routes(
+                    config.clone(),
+                ));
+            }
+            #[cfg(feature = "gcal")]
+            {
+                println!("🔌 Merging GCal Fulfillment routes...");
+                api_router = api_router.merge(connectify_fulfillment::routes(
+                    config.clone(),
+                    app_state.gcal_state,
+                ));
+            }
+
+
+
+        }
+    }
+
+    // --- Create Main App Router ---
+    // Nest all API routes under /api
+    let mut app = Router::new().nest("/api", api_router);
 
     // Conditionally add Swagger UI and JSON endpoint if openapi feature enabled
     #[cfg(feature = "openapi")]
@@ -70,6 +158,8 @@ async fn main() {
         use connectify_gcal::doc::GcalApiDoc;
         #[cfg(feature = "stripe")]
         use connectify_stripe::doc::StripeApiDoc;
+        #[cfg(feature = "fulfillment")]
+        use connectify_fulfillment::doc::FulfillmentApiDoc;
         #[cfg(feature = "payrexx")]
         use connectify_payrexx::doc::PayrexxApiDoc;
         use utoipa::OpenApi;
@@ -99,6 +189,8 @@ async fn main() {
         openapi_doc.merge(TwilioApiDoc::openapi());
         #[cfg(feature = "stripe")]
         openapi_doc.merge(StripeApiDoc::openapi());
+        #[cfg(feature = "fulfillment")]
+        openapi_doc.merge(FulfillmentApiDoc::openapi());
         #[cfg(feature = "payrexx")]
         openapi_doc.merge(PayrexxApiDoc::openapi());
         println!("📖 Adding Swagger UI at /api/docs");

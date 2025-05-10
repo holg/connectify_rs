@@ -42,6 +42,11 @@ pub struct StripeConfig {
     pub product_name: Option<String>,
     // Secret key loaded directly from env var: STRIPE_SECRET_KEY
 }
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+pub struct FulfillmentConfig {
+    pub shared_secret: Option<String>    // Secret key loaded directly from env var: FULFIL_SHARED_SECRET
+}
 
 // --- Payrexx Config ---
 // Holds non-secret Payrexx config. Secret key loaded directly from env var.
@@ -97,6 +102,10 @@ pub struct AppConfig {
     #[serde(default)]
     pub use_stripe: bool,
     #[serde(default)]
+    pub use_gcal: bool,
+    #[serde(default)]
+    pub use_fulfillment: bool,
+    #[serde(default)]
     pub use_payrexx: bool,
     #[serde(default)]
     pub use_calendly: bool,
@@ -108,6 +117,8 @@ pub struct AppConfig {
     pub twilio: Option<TwilioConfig>,
     #[serde(default)]
     pub stripe: Option<StripeConfig>,
+    #[serde(default)]
+    pub fulfillment: Option<FulfillmentConfig>,
     #[serde(default)]
     pub payrexx: Option<PayrexxConfig>,
     #[serde(default)]

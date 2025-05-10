@@ -4,6 +4,7 @@ server:
 use_twilio: true
 use_stripe: true
 use_payrexx: true
+use_fulfillment: true
 
 database:
   url: sqlite://example.db
@@ -39,3 +40,6 @@ calendly:
   client_secret: "xxx"
   refresh_token: "xxx"
   redirect_uri: "https://example.com/api/calendly/callback"
+
+fulfillment:
+  FULFILLMENT_SHARED_SECRET: "some_secret_string_make_it_loooooooooooooooooang!111!"

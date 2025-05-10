@@ -1,0 +1,50 @@
+# --- File: crates/connectify_fulfillment/Cargo.toml ---
+
+[package]
+name = "connectify-fulfillment"
+version = "0.1.0"
+edition = "2021"
+authors = ["Trahe Consult <trahe@mac.com>"] # Please update
+description = "Handles fulfillment logic for Connectify (e.g., booking after payment)"
+license = "MIT OR Apache-2.0" # Choose appropriate license
+
+[features]
+openapi = [ # If this crate exposes its own API endpoints to be documented
+    "dep:utoipa",
+    "utoipa/axum_extras",
+    # No Swagger UI needed here, backend serves that
+]
+gcal = [
+    "dep:connectify-gcal",
+]
+twilio = [
+    "dep:connectify-twilio",
+]
+[dependencies]
+# --- Workspace Deps ---
+axum = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+connectify-config = { path = "../connectify_config"} # To access AppConfig, including fulfillment secret
+tracing = { workspace = true }
+# reqwest = { workspace = true } # Only if this crate makes OUTBOUND http calls
+
+# --- Dependencies on other feature crates (for their logic) ---
+# These should be optional if the fulfillment actions are conditional
+connectify-gcal = { path = "../connectify_gcal", optional = true }
+connectify-twilio = {path = "../connectify_twilio", optional = true }
+# connectify-storage = { workspace = true, optional = true } # If it needs direct DB access
+
+# --- Crate Specific External Deps ---
+# For secure comparison of auth tokens/keys
+constant_time_eq = "0.3"
+
+# --- OpenAPI Deps (Optional based on feature) ---
+utoipa = { workspace = true, optional = true }
+
+[dev-dependencies]
+# mockall = "0.13.1"
+# wiremock = "0.6"
