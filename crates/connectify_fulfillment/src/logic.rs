@@ -2,12 +2,21 @@
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use connectify_config::{AppConfig, GcalConfig}; // To access GCal config
+use connectify_config::{GcalConfig}; // To access GCal config
 use std::sync::Arc;
 
-// Conditionally import GCal specific types if the "gcal" feature is enabled
-// This assumes connectify_fulfillment itself might have a "gcal" feature
-// or that the main backend enables connectify_gcal when fulfillment needs it.
+/// Conditionally imports Google Calendar related functionality when the "gcal" feature is enabled.
+///
+/// This import block brings in the necessary types and functions from the `connectify_gcal` crate
+/// that are required for Google Calendar integration:
+///
+/// # Imports
+/// * `create_calendar_hub` - Function to create an authenticated Google Calendar API client
+/// * `create_calendar_event` (aliased as `gcal_create_event`) - Function to create events in Google Calendar
+/// * `BookSlotRequest` (aliased as `GcalBookSlotRequest`) - Request structure for booking calendar slots
+/// * `GcalError` - Error type for Google Calendar operations
+/// * `HubType` (aliased as `GcalHubType`) - The type representing the Google Calendar API client
+
 #[cfg(feature = "gcal")]
 use connectify_gcal::{
     auth::create_calendar_hub, // Function to create the GCal Hub

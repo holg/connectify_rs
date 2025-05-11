@@ -1,12 +1,12 @@
 // --- File: crates/connectify_fulfillment/src/handlers.rs ---
 use axum::{
     extract::{State},
-    response::{IntoResponse, Json},
+    response::{Json},
     http::StatusCode,
 };
 use std::sync::Arc;
 use connectify_config::AppConfig; // To access shared configuration
-use serde::Deserialize; // For request body deserialization
+// use serde::Deserialize; // For request body deserialization
 
 // Import logic functions and request/response types (we'll define these in logic.rs next)
 use crate::logic::{
