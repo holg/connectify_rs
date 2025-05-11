@@ -62,7 +62,7 @@ fn doc_book_slot_handler() {}
 
 #[utoipa::path(
     delete,
-    path = "/delete/{event_id}",
+    path = "admin/delete/{event_id}",
     params(
         ("event_id" = String, Path, description = "The ID of the event to cancel"),
         ("notify_attendees" = bool, Query, description = "Whether to send cancellation notifications to attendees")
@@ -92,7 +92,7 @@ fn doc_cancel_booking_handler() {}
 
 #[utoipa::path(
     get,
-    path = "/bookings",
+    path = "/admin/bookings",
     params(
         ("start_date" = String, Query, description = "Start date in YYYY-MM-DD format", example = "2025-05-15", format="date"),
         ("end_date" = String, Query, description = "End date in YYYY-MM-DD format", example = "2025-05-20", format="date"),
@@ -127,7 +127,7 @@ fn doc_get_booked_events_handler() {}
 
 #[utoipa::path(
     patch,
-    path = "/mark_cancelled/{event_id}",
+    path = "/admin/mark_cancelled/{event_id}",
     params(
         ("event_id" = String, Path, description = "The ID of the event to mark as cancelled"),
         ("notify_attendees" = bool, Query, description = "Whether to send cancellation notifications to attendees")

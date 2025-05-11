@@ -19,6 +19,7 @@ stripe:
   secret_key: "sk_test_xxx"
   success_url: "https://example.com/api/stripe/success"
   cancel_url: "https://example.com/api/stripe/cancel"
+  payment_success_url: "https://example.com/payment-success.html"
 
 payrexx:
   api_key: "xxx"

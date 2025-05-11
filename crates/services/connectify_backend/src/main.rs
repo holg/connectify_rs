@@ -4,23 +4,24 @@ use connectify_config::load_config;
 #[cfg(feature = "twilio")]
 use connectify_twilio;
 #[cfg(feature = "gcal")]
-use connectify_gcal::{self, routes as gcal_routes, handlers::GcalState, auth::create_calendar_hub};
-#[cfg(feature = "stripe")]
-use connectify_stripe::routes as stripe_routes;
-#[cfg(feature = "fulfillment")]
-use connectify_fulfillment::routes as fulfillment_routes;
-#[cfg(feature = "payrexx")]
-use connectify_payrexx::routes as payrexx_routes;
+use connectify_gcal::{self, handlers::GcalState, auth::create_calendar_hub};
+// #[cfg(feature = "stripe")]
+// use connectify_stripe::routes as stripe_routes;
+// #[cfg(feature = "fulfillment")]
+// use connectify_fulfillment::routes as fulfillment_routes;
+// #[cfg(feature = "payrexx")]
+// use connectify_payrexx::routes as payrexx_routes;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
 use connectify_config::AppConfig;
-use axum::{extract::State, Json};
+// use axum::{extract::State, Json};
 
 
 #[derive(Clone)]
 struct AppState {
+    #[allow(dead_code)]
     config: Arc<AppConfig>,
     #[cfg(feature = "gcal")]
     gcal_state: Option<Arc<GcalState>>, // This state is specific to GCal routes
@@ -91,6 +92,7 @@ async fn main() {
     #[cfg(feature = "gcal")]
     {
         // GCal routes take Arc<GcalState> as state
+        #[allow(unused_variables)]
         if let Some(gcal_state_ref) = app_state.gcal_state.as_ref() { // Check if GcalState was initialized
             if config.use_gcal && config.gcal.is_some() { // Also check runtime flags
                 println!("🔌 Merging GCal routes...");

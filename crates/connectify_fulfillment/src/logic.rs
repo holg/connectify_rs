@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use connectify_config::{GcalConfig}; // To access GCal config
-use std::sync::Arc;
+// use std::sync::Arc;
 
 /// Conditionally imports Google Calendar related functionality when the "gcal" feature is enabled.
 ///
@@ -21,7 +21,7 @@ use std::sync::Arc;
 use connectify_gcal::{
     auth::create_calendar_hub, // Function to create the GCal Hub
     logic::{create_calendar_event as gcal_create_event, BookSlotRequest as GcalBookSlotRequest, GcalError}, // GCal's booking logic and request struct
-    auth::HubType as GcalHubType, // The GCal Hub type
+    // auth::HubType as GcalHubType, // The GCal Hub type
 };
 
 

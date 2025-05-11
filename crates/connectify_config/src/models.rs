@@ -40,6 +40,7 @@ pub struct StripeConfig {
     pub currency: Option<String>,
     pub unit_amount: Option<i64>,
     pub product_name: Option<String>,
+    pub payment_success_url: String, // Mandatory
     // Secret key loaded directly from env var: STRIPE_SECRET_KEY
 }
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

@@ -43,6 +43,7 @@ pub fn routes(
     // Create the specific state needed for Fulfillment handlers
     // This state will hold what the fulfillment logic needs,
     // which might include parts of AppConfig or other feature states.
+    #[allow(unused_variables)]
     let fulfillment_state = Arc::new(FulfillmentState {
         config: config.clone(), // The main AppConfig
         #[cfg(feature = "gcal")]

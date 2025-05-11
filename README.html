@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connectify-RS Workspace README</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #333; }
+        h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h2 { border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        code { background-color: #eee; padding: 2px 5px; border-radius: 4px; font-family: monospace; }
+        pre { background-color: #2d2d2d; color: #f8f8f2; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        pre code { background-color: transparent; padding: 0; }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 5px; }
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        strong { font-weight: bold; }
+        em { font-style: italic; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Connectify-RS: Modular API Service</h1>
+
+    <p>Connectify-RS is a modular backend service built in Rust using the Axum web framework. It's designed as a Cargo workspace to integrate various external services like Twilio for communication, Google Calendar for scheduling, and payment providers like Stripe and Payrexx. The project also includes an internal fulfillment service to orchestrate actions post-payment or other triggers.</p>
+
+    <p>This project aims to provide a robust, configurable, and extensible platform for connecting various services.</p>
+
+    <h2>Table of Contents</h2>
+    <ol>
+        <li><a href="#project-overview">Project Overview</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#workspace-structure">Workspace Structure</a></li>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#configuration">Configuration</a>
+            <ul>
+                <li><a href="#environment-variables-env">Environment Variables (<code>.env</code>)</a></li>
+                <li><a href="#configuration-files-config">Configuration Files (<code>config/</code>)</a></li>
+            </ul>
+        </li>
+        <li><a href="#building-and-running">Building and Running</a>
+            <ul>
+                <li><a href="#building">Building</a></li>
+                <li><a href="#running-the-backend-service">Running the Backend Service</a></li>
+                <li><a href="#enabling-features">Enabling Features</a></li>
+            </ul>
+        </li>
+        <li><a href="#api-documentation-swagger-ui">API Documentation (Swagger UI)</a></li>
+        <li><a href="#crate-details">Crate Details</a>
+            <ul>
+                <li><a href="#connectify_backend-main-service"><code>connectify_backend</code> (Main Service)</a></li>
+                <li><a href="#connectify_config-core"><code>connectify_config</code> (Core)</a></li>
+                <li><a href="#connectify_twilio-optional"><code>connectify_twilio</code> (Optional)</a></li>
+                <li><a href="#connectify_gcal-optional"><code>connectify_gcal</code> (Optional)</a></li>
+                <li><a href="#connectify_payrexx-optional"><code>connectify_payrexx</code> (Optional)</a></li>
+                <li><a href="#connectify_stripe-optional"><code>connectify_stripe</code> (Optional)</a></li>
+                <li><a href="#connectify_fulfillment-optional"><code>connectify_fulfillment</code> (Optional)</a></li>
+                <li><a href="#connectify_common-placeholder"><code>connectify_common</code> (Placeholder)</a></li>
+                <li><a href="#connectify_calendly-placeholderwip"><code>connectify_calendly</code> (Placeholder/WIP)</a></li>
+            </ul>
+        </li>
+        <li><a href="#testing">Testing</a></li>
+        <li><a href="#security-considerations">Security Considerations</a></li>
+        <li><a href="#contributing">Contributing</a></li>
+        <li><a href="#license">License</a></li>
+    </ol>
+
+    <h2 id="project-overview">Project Overview</h2>
+    <p>Connectify-RS serves as a backend hub, enabling seamless integration with various third-party services. Its modular architecture, built using a Cargo workspace, allows for features to be selectively enabled or disabled. This adaptability makes it suitable for a variety of applications requiring communication, scheduling, and payment processing capabilities.</p>
+    <p>The core of the system is an Axum-based web server that exposes API endpoints for these integrations.</p>
+
+    <h2 id="features">Features</h2>
+    <ul>
+        <li><strong>Modular Design:</strong> Easily enable or disable integrations via Cargo features and runtime configuration.</li>
+        <li><strong>Centralized Configuration:</strong> Unified configuration management using <code>config-rs</code> and <code>dotenv</code>.</li>
+        <li><strong>Twilio Integration:</strong> Generate access tokens for Twilio Video.</li>
+        <li><strong>Google Calendar Integration:</strong> Check availability and book events on Google Calendar via Service Account authentication.</li>
+        <li><strong>Payment Processing:</strong>
+            <ul>
+                <li><strong>Stripe:</strong> Create Stripe Checkout Sessions and handle webhooks for payment confirmation.</li>
+                <li><strong>Payrexx:</strong> Create Payrexx payment gateways (payment links) and handle webhooks.</li>
+            </ul>
+        </li>
+        <li><strong>Fulfillment Service:</strong> An internal API service to orchestrate post-payment actions, such as booking a Google Calendar event after a successful Stripe payment. Secured via a shared secret.</li>
+        <li><strong>API Documentation:</strong> OpenAPI (Swagger) documentation generated automatically using <code>utoipa</code> for enabled API endpoints.</li>
+    </ul>
+
+    <h2 id="workspace-structure">Workspace Structure</h2>
+    <p>The project is a Cargo workspace with the following key components:</p>
+    <pre><code>connectify_rs/
+├── Cargo.toml                # Root workspace manifest
+├── crates/
+│   ├── connectify_config/    # Core configuration loading and models
+│   ├── connectify_gcal/      # Google Calendar integration
+│   ├── connectify_payrexx/   # Payrexx integration
+│   ├── connectify_stripe/    # Stripe integration
+│   ├── connectify_twilio/    # Twilio integration
+│   ├── connectify_fulfillment/ # Fulfillment service logic
+│   ├── connectify_common/    # (Placeholder) Shared utilities
+│   ├── connectify_calendly/  # (Placeholder/WIP) Calendly integration
+│   └── services/
+│       ├── connectify_backend/ # Main Axum backend service (executable)
+│       └── rustdis/            # (Placeholder) Redis-like service
+├── config/
+│   └── default.yml           # Default configuration values
+└── .env                      # For local environment variables (DO NOT COMMIT)
+</code></pre>
+    <p><em>(Note: <code>connectify_calendly</code> and <code>rustdis</code> are part of the provided tree structure but might not be fully active members in the root <code>Cargo.toml</code> yet or are placeholders.)</em></p>
+
+    <h2 id="prerequisites">Prerequisites</h2>
+    <ul>
+        <li><strong>Rust:</strong> Latest stable version recommended (<a href="https://www.rust-lang.org/tools/install">Install Rust</a>).</li>
+        <li><strong>Cargo:</strong> Comes with Rust.</li>
+        <li><strong>Third-Party Accounts &amp; Credentials:</strong>
+            <ul>
+                <li>Twilio Account SID, API Key SID, API Key Secret.</li>
+                <li>Google Cloud Platform project with the Calendar API enabled. A Service Account JSON key file is required for the current GCal authentication method.</li>
+                <li>Stripe Account with API Secret Key and Webhook Signing Secret.</li>
+                <li>Payrexx Account with Instance Name and API Secret.</li>
+            </ul>
+        </li>
+        <li><strong>(Optional) <code>ngrok</code>:</strong> Or a similar tool for exposing your local server to the internet for testing webhooks from Stripe and Payrexx.</li>
+    </ul>
+
+    <h2 id="configuration">Configuration</h2>
+    <p>Configuration is layered, managed by <code>config-rs</code>:</p>
+    <ol>
+        <li><strong><code>config/default.yml</code></strong>: Base values for all environments.</li>
+        <li><strong><code>config/{RUN_ENV}.yml</code></strong>: Environment-specific overrides (e.g., <code>config/development.yml</code>, <code>config/production.yml</code>).</li>
+        <li><strong>Environment Variables</strong>: Loaded via <code>.env</code> file and system environment. These override file configurations.</li>
+    </ol>
+
+    <h3 id="environment-variables-env">Environment Variables (<code>.env</code>)</h3>
+    <p>Create a <code>.env</code> file in the workspace root (<code>connectify_rs/</code>) for local development. <strong>Add this file to your <code>.gitignore</code> to prevent committing secrets.</strong></p>
+    <p><strong>Key Variables:</strong></p>
+    <ul>
+        <li><code>RUN_ENV</code>: (e.g., <code>development</code>, <code>production</code>) Determines which environment-specific YAML is loaded. Defaults to <code>debug</code> (as per your <code>connectify_config/lib.rs</code> if <code>RUN_ENV</code> is not set).</li>
+        <li><code>PREFIX</code>: (e.g., <code>APP</code> or <code>HTR</code> as per your <code>connectify_config/lib.rs</code>) Prefix for environment variables that <code>config-rs</code> will map to <code>AppConfig</code> fields (e.g., <code>HTR_SERVER__PORT=8086</code>).</li>
+        <li><strong>Service Secrets (MUST be set via environment):</strong>
+            <ul>
+                <li><code>TWILIO_API_KEY_SECRET</code></li>
+                <li><code>STRIPE_SECRET_KEY</code></li>
+                <li><code>STRIPE_WEBHOOK_SECRET</code></li>
+                <li><code>PAYREXX_API_SECRET</code></li>
+                <li><code>GOOGLE_SERVICE_ACCOUNT_KEY_PATH</code>: Full path to your GCal service account JSON key file.</li>
+                <li><code>FULFILLMENT_SHARED_SECRET</code>: A strong, random secret for authenticating internal calls to the fulfillment service.</li>
+            </ul>
+        </li>
+        <li><strong>Other Service Configurations (can be in <code>.env</code> or YAML; env vars take precedence if prefixed according to <code>PREFIX</code>):</strong>
+            <ul>
+                <li><code>GCAL_CALENDAR_ID</code> (or <code>HTR_GCAL__CALENDAR_ID</code>)</li>
+                <li><code>HTR_TWILIO__ACCOUNT_SID</code>, <code>HTR_TWILIO__API_KEY_SID</code></li>
+                <li><code>HTR_STRIPE__SUCCESS_URL</code>, <code>HTR_STRIPE__CANCEL_URL</code></li>
+                <li><code>HTR_PAYREXX__INSTANCE_NAME</code>, <code>HTR_PAYREXX__SUCCESS_URL</code>, etc.</li>
+                <li><code>HTR_GCAL__KEY_PATH</code> (can override default path if <code>GOOGLE_SERVICE_ACCOUNT_KEY_PATH</code> is not used directly)</li>
+                <li><code>HTR_SERVER__HOST</code>, <code>HTR_SERVER__PORT</code></li>
+            </ul>
+        </li>
+    </ul>
+
+    <h3 id="configuration-files-config">Configuration Files (<code>config/</code>)</h3>
+    <p>The <code>AppConfig</code> struct in <code>crates/connectify_config/src/models.rs</code> defines the expected structure. It includes:</p>
+    <ul>
+        <li><code>server</code>: Host and port.</li>
+        <li><code>database</code>: Optional database URL.</li>
+        <li><code>use_XXX</code>: Boolean flags (e.g., <code>use_twilio</code>, <code>use_gcal</code>) to enable/disable features at runtime. These default to <code>false</code> if not specified in YAML or overridden by environment variables.</li>
+        <li>Optional configuration sections for each feature: <code>twilio</code>, <code>stripe</code>, <code>payrexx</code>, <code>gcal</code>, <code>fulfillment</code>, <code>calendly</code>.</li>
+    </ul>
+
+    <h2 id="building-and-running">Building and Running</h2>
+    <p>All commands should be run from the workspace root (<code>connectify_rs/</code>).</p>
+
+    <h3 id="building">Building</h3>
+    <ul>
+        <li><strong>Build all crates with all defined features in the workspace:</strong>
+            <pre><code>cargo build --all-features</code></pre>
+        </li>
+        <li><strong>Build the backend service with specific features:</strong>
+            <pre><code># Example: Build with gcal, twilio, and openapi documentation
+cargo build -p connectify-backend --features gcal,twilio,openapi</code></pre>
+        </li>
+    </ul>
+
+    <h3 id="running-the-backend-service">Running the Backend Service</h3>
+    <p>The main executable is <code>connectify-backend</code>.</p>
+    <pre><code># Example: Run with gcal, twilio, payrexx, fulfillment, and openapi features enabled,
+# loading environment variables from .env (or a specified file like .env.secret)
+cargo run -p connectify-backend --features gcal,twilio,payrexx,fulfillment,openapi -- .env
+</code></pre>
+    <ul>
+        <li>The argument after <code>--</code> (e.g., <code>.env</code>) is passed to the <code>ensure_dotenv_loaded</code> function to specify a custom environment file path. If omitted, it defaults to looking for <code>.env</code>.</li>
+        <li>The server will start, and the console will indicate the address (e.g., <code>http://127.0.0.1:8086</code>).</li>
+    </ul>
+
+    <h3 id="enabling-features">Enabling Features</h3>
+    <p>Features are controlled at two levels:</p>
+    <ol>
+        <li><strong>Compile-Time (Cargo Features):</strong> Defined in <code>connectify_backend/Cargo.toml</code>. These determine which crates and code paths are compiled into the final binary. Use the <code>--features</code> flag with <code>cargo run</code> or <code>cargo build</code>.
+            <ul>
+                <li><code>openapi</code>: Enables API documentation generation and Swagger UI.</li>
+                <li><code>twilio</code>, <code>gcal</code>, <code>payrexx</code>, <code>stripe</code>, <code>fulfillment</code>: Enable the respective service integrations. These backend features also forward the <code>openapi</code> feature to the sub-crates if <code>openapi</code> is enabled for the backend, and enable specific sub-features (like <code>connectify-fulfillment/gcal</code>) if needed.</li>
+            </ul>
+        </li>
+        <li><strong>Run-Time (Configuration Flags):</strong> Defined in <code>AppConfig</code> (e.g., <code>use_twilio: bool</code>). These are loaded from your YAML files or environment variables. For a feature's routes to be active, its compile-time feature flag must be enabled, AND its corresponding <code>use_XXX</code> runtime flag in the config must be <code>true</code>, AND its specific configuration section (e.g., <code>config.gcal</code>) must be present and valid if required by the logic.</li>
+    </ol>
+
+    <h2 id="api-documentation-swagger-ui">API Documentation (Swagger UI)</h2>
+    <p>If the <code>openapi</code> feature is enabled when building/running <code>connectify_backend</code>, Swagger UI will be available to explore and test the API endpoints.</p>
+    <ul>
+        <li><strong>Swagger UI URL:</strong> <code>http://&lt;your_server_address_and_port&gt;/api/docs</code>
+            <ul><li>Example (local): <code>http://127.0.0.1:8086/api/docs</code></li></ul>
+        </li>
+        <li><strong>OpenAPI JSON Spec:</strong> The raw OpenAPI specification is available at <code>http://&lt;your_server_address_and_port&gt;/api/docs/openapi.json</code></li>
+    </ul>
+    <p>The documentation is generated using <code>utoipa</code> and will include endpoints from all feature crates that were compiled with their respective <code>openapi</code> features enabled (due to feature forwarding from <code>connectify_backend</code>).</p>
+
+    <h2 id="crate-details">Crate Details</h2>
+
+    <h3 id="connectify_backend-main-service"><code>connectify_backend</code> (Main Service)</h3>
+    <ul>
+        <li><strong>Path:</strong> <code>crates/services/connectify_backend</code></li>
+        <li><strong>Purpose:</strong> The main Axum web server application. It loads the unified <code>AppConfig</code>, initializes and shares application state (like <code>GcalState</code>), conditionally merges routers from feature crates based on compile-time features and runtime configuration, and serves all API endpoints under the <code>/api</code> prefix. Also handles serving Swagger UI if the <code>openapi</code> feature is enabled.</li>
+    </ul>
+
+    <h3 id="connectify_config-core"><code>connectify_config</code> (Core)</h3>
+    <ul>
+        <li><strong>Path:</strong> <code>crates/connectify_config</code></li>
+        <li><strong>Purpose:</strong> Defines the unified <code>AppConfig</code> structure and handles loading configuration from YAML files and environment variables. This is a mandatory dependency for most other crates.</li>
+    </ul>
+
+    <h3 id="connectify_twilio-optional"><code>connectify_twilio</code> (Optional)</h3>
+    <ul>
+        <li><strong>Path:</strong> <code>crates/connectify_twilio</code></li>
+        <li><strong>Purpose:</strong> Provides an endpoint (<code>/api/twilio/generate-token</code>) for generating Twilio Video access tokens.</li>
+        <li><strong>Configuration:</strong> Reads Twilio credentials (<code>account_sid</code>, <code>api_key_sid</code>, <code>api_key_secret</code>) from <code>AppConfig.twilio</code>.</li>
+        <li><strong>Backend Feature:</strong> <code>twilio</code></li>
+    </ul>
+
+    <h3 id="connectify_gcal-optional"><code>connectify_gcal</code> (Optional)</h3>
+    <ul>
+        <li><strong>Path:</strong> <code>crates/connectify_gcal</code></li>
+        <li><strong>Purpose:</strong> Integrates with Google Calendar. Provides endpoints for checking availability (<code>/api/gcal/availability</code>) and booking events (<code>/api/gcal/book</code>), and managing bookings.</li>
+        <li><strong>Authentication:</strong> Uses a Service Account JSON key file (path specified in <code>AppConfig.gcal.key_path</code>).</li>
+        <li><strong>Backend Feature:</strong> <code>gcal</code></li>
+    </ul>
+
+    <h3 id="connectify_payrexx-optional"><code>connectify_payrexx</code> (Optional)</h3>
+    <ul>
+        <li><strong>Path:</strong> <code>crates/connectify_payrexx</code></li>
+        <li><strong>Purpose:</strong> Integrates with the Payrexx payment gateway.
+            <ul>
+                <li>Creates payment gateways (payment links) via <code>/api/payrexx/create-gateway</code>.</li>
+                <li>Handles incoming webhooks from Payrexx at <code>/api/payrexx/webhook</code> for payment status updates.</li>
+                <li>Provides redirect handlers for success, failure, and cancellation URLs.</li>
+            </ul>
+        </li>
+        <li><strong>Authentication:</strong> Uses an instance name and API Secret (loaded from environment via <code>AppConfig.payrexx</code> and <code>PAYREXX_API_SECRET</code> env var). Uses HMAC-SHA256 signature for API requests.</li>
+        <li><strong>Backend Feature:</strong> <code>payrexx</code></li>
+    </ul>
+
+    <h3 id="connectify_stripe-optional"><code>connectify_stripe</code> (Optional)</h3>
+    <ul>
+        <li><strong>Path:</strong> <code>crates/connectify_stripe</code></li>
+        <li><strong>Purpose:</strong> Integrates with the Stripe payment gateway using Stripe Checkout.
+            <ul>
+                <li>Creates Stripe Checkout Sessions via <code>/api/stripe/create-checkout-session</code>.</li>
+                <li>Handles incoming webhooks from Stripe at <code>/api/stripe/webhook</code> (requires <code>STRIPE_WEBHOOK_SECRET</code>).</li>
+                <li>Provides redirect handlers for success and cancellation URLs.</li>
+            </ul>
+        </li>
+        <li><strong>Authentication:</strong> Uses Stripe API Secret Key (loaded from environment via <code>STRIPE_SECRET_KEY</code> env var).</li>
+        <li><strong>Backend Feature:</strong> <code>stripe</code></li>
+    </ul>
+
+    <h3 id="connectify_fulfillment-optional"><code>connectify_fulfillment</code> (Optional)</h3>
+    <ul>
+        <li><strong>Path:</strong> <code>crates/connectify_fulfillment</code></li>
+        <li><strong>Purpose:</strong> An internal service to orchestrate post-payment or other triggered actions. For example, after a successful Stripe payment, the Stripe webhook handler can call an endpoint on this service to book a Google Calendar event.</li>
+        <li><strong>Endpoints:</strong> Example: <code>/api/fulfill/gcal-booking</code> (POST).</li>
+        <li><strong>Authentication:</strong> Endpoints are secured via a shared secret passed in the <code>X-Internal-Auth-Secret</code> header (configured via <code>AppConfig.fulfillment.shared_secret</code> loaded from <code>FULFILLMENT_SHARED_SECRET</code> env var).</li>
+        <li><strong>Backend Feature:</strong> <code>fulfillment</code>. Sub-features like <code>connectify-fulfillment/gcal</code> enable specific fulfillment logic.</li>
+    </ul>
+
+    <h3 id="connectify_common-placeholder"><code>connectify_common</code> (Placeholder)</h3>
+    <ul>
+        <li><strong>Path:</strong> <code>crates/connectify_common</code></li>
+        <li><strong>Purpose:</strong> Intended for shared utility functions, common data structures, or custom error types that might be used across multiple feature crates in the workspace. Currently a placeholder.</li>
+    </ul>
+
+    <h3 id="connectify_calendly-placeholderwip"><code>connectify_calendly</code> (Placeholder/WIP)</h3>
+    <ul>
+        <li><strong>Path:</strong> <code>crates/connectify_calendly</code></li>
+        <li><strong>Purpose:</strong> Intended for Calendly integration. The existing code is Actix-Web based and needs refactoring for Axum.</li>
+        <li><strong>Status:</strong> Currently commented out in the root <code>Cargo.toml</code> <code>members</code> list.</li>
+    </ul>
+
+    <h2 id="testing">Testing</h2>
+    <ul>
+        <li>Each crate should contain its own unit tests (e.g., for logic functions) and integration tests (e.g., for handlers, potentially using <code>wiremock</code> to mock external API responses for testing feature crates in isolation).</li>
+        <li>Run tests for a specific crate: <code>cargo test -p &lt;crate_name&gt; --features &lt;relevant_features&gt;</code></li>
+        <li>Run tests for the entire workspace: <code>cargo test --all-features</code> (if applicable)</li>
+        <li><strong>Webhook Testing:</strong> Use tools like <code>ngrok</code> to expose your local development server to the internet for receiving webhooks from Stripe and Payrexx. Stripe CLI also offers webhook forwarding and event triggering.</li>
+    </ul>
+
+    <h2 id="security-considerations">Security Considerations</h2>
+    <ul>
+        <li><strong>Secrets Management:</strong> <strong>Never commit secrets</strong> (API keys, webhook secrets, database credentials, fulfillment shared secret) to version control. Load them exclusively from environment variables (e.g., via a <code>.env</code> file that is in <code>.gitignore</code>).</li>
+        <li><strong>Webhook Signature Verification:</strong> Always verify webhook signatures (Stripe, Payrexx) to ensure requests are genuinely from the payment provider.</li>
+        <li><strong>Fulfillment API Security:</strong> The fulfillment service API is internal. Ensure it's not publicly exposed without authentication (the shared secret header is a good start for server-to-server calls).</li>
+        <li><strong>Input Validation:</strong> Sanitize and validate all user inputs and data received from external APIs/webhooks.</li>
+        <li><strong>Error Handling:</strong> Implement robust error handling and avoid leaking sensitive information in error messages to clients.</li>
+        <li><strong>Dependencies:</strong> Keep dependencies updated to patch security vulnerabilities. Run <code>cargo audit</code> periodically.</li>
+        <li><strong>HTTPS:</strong> Ensure your production deployment uses HTTPS for all communication.</li>
+    </ul>
+
+    <h2 id="contributing">Contributing</h2>
+    <p>(This section would detail how others can contribute to the project, including coding standards, pull request processes, and issue tracking.)</p>
+
+    <h2 id="license">License</h2>
+    <p>This project is licensed under the MIT OR Apache-2.0 license. Please refer to the <code>Cargo.toml</code> in the workspace root and individual crates for specific details.</p>
+</div>
+</body>
+</html>

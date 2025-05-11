@@ -35,13 +35,14 @@ pub async fn routes(config: Arc<AppConfig>) -> Router {
 
     Router::new()
         .route("/availability", get(get_availability_handler))
+        .route("/available-slots", get(get_availability_handler))
         .route("/book", post(book_slot_handler))
-        .route("/delete/{event_id}", delete(delete_event_handler))
+        .route("/admin/delete/{event_id}", delete(delete_event_handler))
         .route(
-            "/mark_cancelled/{event_id}",
+            "/admin/mark_cancelled/{event_id}",
             patch(mark_booking_cancelled_handler),
         )
-        .route("/bookings", get(get_booked_events_handler))
+        .route("/admin/bookings", get(get_booked_events_handler))
         // Add this new route
         .with_state(gcal_state)
 }

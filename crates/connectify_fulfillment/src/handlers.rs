@@ -93,7 +93,7 @@ pub async fn handle_gcal_booking_fulfillment(
                     Err((StatusCode::INTERNAL_SERVER_ERROR, msg))
                 }
                 FulfillmentError::ConfigError(msg) => {
-                    Err((StatusCode::INTERNAL_SERVER_ERROR, "Missing e.g. GCal configuration.".to_string()))
+                    Err((StatusCode::INTERNAL_SERVER_ERROR, msg))
                 }
             }
         }
