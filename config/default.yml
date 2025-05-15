@@ -10,20 +10,35 @@ database:
   url: sqlite://example.db
 
 twilio:
-  account_sid: "ACxxx"
-  api_key_sid: "`api_key_sid`"
-  api_key_secret: "secret"
-  verify_service_sid: "VAxxx"
+  account_sid: "secret_from_env"
+  api_key_sid: "secret_from_env"
+  api_key_secret: "secret_from_env"
+  verify_service_sid: "secret_from_env"
 
 stripe:
-  secret_key: "sk_test_xxx"
+  secret_key: "secret_from_env"
   success_url: "https://example.com/api/stripe/success"
   cancel_url: "https://example.com/api/stripe/cancel"
   payment_success_url: "https://example.com/payment-success.html"
+  default_currency: "CHF"
+  price_tiers:
+    - duration_minutes: 15
+      unit_amount: 7000 # 70.00 CHF
+      product_name: "Short Call (15 Min)"
+    #      currency: "CHF" # optional
+    - duration_minutes: 30
+      unit_amount: 12000 # 120.00 CHF
+      product_name: "Base Call (30 Min)"
+    - duration_minutes: 45
+      unit_amount: 18000 # 180.00 CHF
+      product_name: "Standard Call (45 Min)"
+    - duration_minutes: 60
+      unit_amount: 25000 # 250.00 CHF
+      product_name: "Intense Call (60 Min)"
 
 payrexx:
-  api_key: "xxx"
-  secret_key: "xxx"
+  api_key: "secret_from_env"
+  secret_key: "secret_from_env"
   currency: "EUR"
   instance_name: "My Payrexx Instance"
   success_url: "https://example.com/api/payrexx/success"
@@ -32,15 +47,15 @@ payrexx:
 
 
 gcal:
-  client_id: "xxx"
-  client_secret: "xxx"
-  refresh_token: "xxx"
+  client_id: "secret_from_env"
+  client_secret: "secret_from_env"
+  refresh_token: "secret_from_env"
   key_path: "./service_account_key.json"
 calendly:
-  client_id: "xxx"
-  client_secret: "xxx"
-  refresh_token: "xxx"
+  client_id: "secret_from_env"
+  client_secret: "secret_from_env"
+  refresh_token: "secret_from_env"
   redirect_uri: "https://example.com/api/calendly/callback"
 
 fulfillment:
-  FULFILLMENT_SHARED_SECRET: "some_secret_string_make_it_loooooooooooooooooang!111!"
+  FULFILLMENT_SHARED_SECRET: "secret_from_env"

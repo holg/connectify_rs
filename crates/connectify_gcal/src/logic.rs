@@ -3,6 +3,9 @@ use crate::auth::HubType; // Use the specific Hub type alias
 use chrono::{DateTime, Datelike, Duration, NaiveTime, Utc, Weekday}; // Use chrono Duration
 use google_calendar3::api::{Event, EventDateTime, FreeBusyRequest, FreeBusyRequestItem};
 use serde::{Deserialize, Serialize};
+
+
+// To access GCal config
 #[cfg(feature = "openapi")]
 use utoipa::ToSchema; //, IntoParams};
 
@@ -18,6 +21,8 @@ pub enum GcalError {
     CalculationError(String),
     #[error("Booking conflict")] // Example specific error
     Conflict,
+    #[error("No matching price tier found for duration: {0} minutes")] // Added for pricing
+    NoMatchingPriceTier(i64),
 }
 
 // --- Data Structures ---
@@ -34,16 +39,32 @@ pub struct AvailabilityQuery {
     pub end_date: String,
 
     /// Duration in minutes
-    #[cfg_attr(feature = "openapi", schema(example = 60))]
+    #[cfg_attr(feature = "openapi", schema(example = 45))]
     pub duration_minutes: i64,
 }
 
 #[derive(Serialize, Debug)]
 #[cfg_attr(feature = "openapi", derive(ToSchema))]
 pub struct AvailableSlotsResponse {
-    pub slots: Vec<String>, // ISO 8601 format strings (e.g., "2025-04-25T10:00:00Z")
+    pub slots: Vec<PricedSlot>, 
 }
 
+#[derive(Serialize, Debug, Clone)]
+#[cfg_attr(feature = "openapi", derive(ToSchema))]
+pub struct PricedSlot {
+    #[cfg_attr(feature = "openapi", schema(example = "2025-05-15T10:00:00Z"))]
+    pub start_time: String, // ISO 8601 format
+    #[cfg_attr(feature = "openapi", schema(example = "2025-05-15T11:00:00Z"))]
+    pub end_time: String, // ISO 8601 format
+    #[cfg_attr(feature = "openapi", schema(example = 60))]
+    pub duration_minutes: i64,
+    #[cfg_attr(feature = "openapi", schema(example = 7500))] // e.g. 75.00 CHF in cents
+    pub price: i64,
+    #[cfg_attr(feature = "openapi", schema(example = "CHF"))]
+    pub currency: String,
+    #[cfg_attr(feature = "openapi", schema(example = "Premium Beratung (60 Min)"))]
+    pub product_name: Option<String>,
+}
 #[derive(Deserialize, Debug)]
 #[cfg_attr(feature = "openapi", derive(ToSchema))]
 pub struct BookSlotRequest {

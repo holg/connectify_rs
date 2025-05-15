@@ -370,9 +370,24 @@ name = "connectify-config"
 version = "0.1.0"
 dependencies = [
  "config",
+ "connectify-config-static",
  "dotenv",
  "once_cell",
  "serde",
+ "serde_json",
+ "utoipa",
+ "utoipa-swagger-ui",
+]
+
+[[package]]
+name = "connectify-config-static"
+version = "0.1.0"
+dependencies = [
+ "config",
+ "dotenv",
+ "once_cell",
+ "serde",
+ "serde_json",
  "utoipa",
  "utoipa-swagger-ui",
 ]
@@ -443,6 +458,7 @@ name = "connectify-stripe"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "chrono",
  "connectify-config",
  "hex",
  "hmac",

@@ -3,6 +3,7 @@ unsafe_code = "forbid"
 [workspace]
 members = [
     "crates/services/connectify_backend",
+    "crates/connectify_config_static",
     "crates/connectify_config",
 #    "crates/connectify_calendly",
     "crates/connectify_gcal",

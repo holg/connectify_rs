@@ -31,7 +31,7 @@ once_cell = { workspace = true } # For static HTTP client
 hmac = { workspace = true } # For HMAC-SHA256
 sha2 = { workspace = true } # For HMAC-SHA256
 hex = {workspace = true}
-
+chrono = {workspace = true}
 # --- OpenAPI Deps (Optional based on feature) ---
 utoipa = { workspace = true, optional = true }
 utoipa-swagger-ui = { workspace = true, optional = true }

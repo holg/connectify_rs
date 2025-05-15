@@ -24,10 +24,25 @@ pub struct DatabaseConfig {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TwilioConfig {
-    pub account_sid: String, // Loaded via APP_TWILIO__ACCOUNT_SID or TWILIO_ACCOUNT_SID
-    pub api_key_sid: String, // Loaded via APP_TWILIO__API_KEY_SID or TWILIO_API_KEY_SID
+    pub account_sid: String, // Loaded via TWILIO_ACCOUNT_SID
+    pub api_key_sid: String, // Loaded via TWILIO_API_KEY_SID
     pub api_key_secret: String,
     // Secret loaded directly from env var: TWILIO_API_KEY_SECRET
+}
+
+#[cfg_attr(feature = "openapi", derive(ToSchema))]
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct PriceTier {
+    /// Duration in minutes for this price tier.
+    pub duration_minutes: i64,
+    /// Price in the smallest currency unit (e.g., cents).
+    pub unit_amount: i64,
+    /// Optional product name specific to this tier.
+    pub product_name: Option<String>,
+    /// Optional currency code for this tier.
+    pub currency: Option<String>,
+    // You could add a Price ID here if you manage prices directly in Stripe Dashboard
+    // pub price_id: Option<String>,
 }
 
 // --- Stripe Config ---
@@ -37,11 +52,13 @@ pub struct TwilioConfig {
 pub struct StripeConfig {
     pub success_url: String, // Mandatory
     pub cancel_url: String,  // Mandatory
-    pub currency: Option<String>,
+    pub default_currency: Option<String>,
     pub unit_amount: Option<i64>,
     pub product_name: Option<String>,
     pub payment_success_url: String, // Mandatory
-    // Secret key loaded directly from env var: STRIPE_SECRET_KEY
+    /// List of price tiers for different durations.
+    #[serde(default)] // Defaults to an empty vec if not present in config
+    pub price_tiers: Vec<PriceTier>,
 }
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone, Default)]
@@ -61,6 +78,9 @@ pub struct PayrexxConfig {
     pub currency: Option<String>,
     pub unit_amount: Option<i64>,
     pub product_name: Option<String>,
+    /// List of price tiers for different durations.
+    #[serde(default)] // Defaults to an empty vec if not present in config
+    pub price_tiers: Vec<PriceTier>,
     // API Secret loaded directly from env var: PAYREXX_API_SECRET
 }
 
@@ -86,8 +106,7 @@ pub struct GcalConfig {
     // pub calendar_id: String, // Mandatory
     pub key_path: Option<String>, // Mandatory
     pub calendar_id: Option<String>, // Mandatory
-                                  // Secrets loaded directly from env vars:
-                                  // GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON
+    pub time_slot_duration: Option<u16>, // In minutes                                  
 }
 
 // --- Unified App Configuration ---

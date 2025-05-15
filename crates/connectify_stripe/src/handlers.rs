@@ -82,10 +82,6 @@ pub async fn create_checkout_session_handler(
                     message,
                 ))
             }
-            Err(StripeError::InternalError(msg)) => {
-                eprintln!("Stripe Internal Logic Error: {}", msg);
-                Err((StatusCode::INTERNAL_SERVER_ERROR, msg))
-            }
             // These errors are for webhook handling, not checkout session creation
             Err(StripeError::WebhookSignatureError(_))
             | Err(StripeError::WebhookProcessingError(_)) => {
@@ -116,6 +112,19 @@ pub async fn create_checkout_session_handler(
                     "Session not found or not paid".to_string(),
                 ))
             }
+            Err(StripeError::InvalidFulfillmentDataForPricing(msg)) => {
+                eprintln!("Invalid fulfillment data for pricing: {}", msg);
+                Err((StatusCode::INTERNAL_SERVER_ERROR, msg))
+            }
+            Err(StripeError::NoMatchingPriceTier(duration)) => {
+                eprintln!("No matching price tier for duration: {} minutes", duration);
+                Err((StatusCode::BAD_REQUEST, format!("No price tier available for {} minute duration.", duration)))
+            }
+            Err(StripeError::InternalError(msg)) => {
+                eprintln!("Stripe Internal Logic Error: {}", msg);
+                Err((StatusCode::INTERNAL_SERVER_ERROR, msg))
+            }
+
         }
     } else {
         Err((

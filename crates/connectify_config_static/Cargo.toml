@@ -1,5 +1,5 @@
 [package]
-name = "connectify-config"
+name = "connectify-config-static"
 version = "0.1.0"
 edition = "2021"
 [features]
@@ -14,11 +14,4 @@ utoipa-swagger-ui = { workspace = true, optional = true }
 config = { workspace = true }
 dotenv = { workspace = true }
 once_cell = { workspace = true }
-serde_json = { workspace = true }
-connectify-config-static = { path = "../connectify_config_static" }
-[build-dependencies]
-dotenv = { version = "0.15", optional = true }
-config = { workspace = true }
-connectify-config-static = { path = "../connectify_config_static" }
-serde = { workspace = true }
-serde_json = { workspace = true }
+serde_json = { workspace = true}

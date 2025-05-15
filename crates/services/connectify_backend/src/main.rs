@@ -195,11 +195,11 @@ async fn main() {
         openapi_doc.merge(FulfillmentApiDoc::openapi());
         #[cfg(feature = "payrexx")]
         openapi_doc.merge(PayrexxApiDoc::openapi());
-        println!("📖 Adding Swagger UI at /api/docs");
+        println!("📖 Adding Swagger UI at /admin/api/docs");
 
         // Create the Swagger UI route, referencing the merged doc
         let swagger_ui =
-            SwaggerUi::new("/api/docs").url("/api/docs/openapi.json", openapi_doc.clone());
+            SwaggerUi::new("/admin/api/docs").url("/admin/api/docs/openapi.json", openapi_doc.clone());
         // Merge the Swagger UI into the main app router
         app = app.merge(swagger_ui);
     }
