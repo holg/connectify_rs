@@ -2,11 +2,11 @@
 #![allow(dead_code)]
 #![cfg(feature = "openapi")]
 use utoipa::OpenApi;
-use serde_json::json;
+// use serde_json::json;
 // Import all relevant schemas from logic.rs and handlers.rs
 use crate::logic::{
     InitiateAdhocSessionRequest, InitiateAdhocSessionResponse,
-    AdhocSessionError
+    // AdhocSessionError
 };
 
 /// Documentation for the initiate_adhoc_session_handler endpoint

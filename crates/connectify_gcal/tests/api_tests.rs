@@ -76,14 +76,14 @@ async fn test_get_availability_endpoint() {
     let config = create_mock_config();
 
     // Try to create the router
-    let result = std::panic::catch_unwind(|| {
+    let _result = std::panic::catch_unwind(|| {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
             // Create the router
-            let app = routes(config).await;
+            let _app = routes(config).await;
 
             // Create a request to the availability endpoint
-            let request = Request::builder()
+            let _request = Request::builder()
                 .uri("/availability?start_date=2025-01-01&end_date=2025-01-07&duration_minutes=60")
                 .method("GET")
                 .body(Body::empty())
@@ -120,10 +120,10 @@ async fn test_book_slot_endpoint() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
             // Create the router
-            let app = routes(config).await;
+            let _app = routes(config).await;
 
             // Create a request to the book endpoint
-            let request = Request::builder()
+            let _request = Request::builder()
                 .uri("/book")
                 .method("POST")
                 .header("Content-Type", "application/json")

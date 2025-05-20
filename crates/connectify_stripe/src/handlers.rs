@@ -1,5 +1,6 @@
 // --- File: crates/connectify_stripe/src/handlers.rs ---
 // use crate::error::StripeError;
+use tracing::info;
 use crate::logic::{
     create_checkout_session, get_checkout_session_details, list_checkout_sessions_admin,
     process_stripe_webhook, verify_stripe_signature, CreateCheckoutSessionRequest,
@@ -90,7 +91,7 @@ pub async fn stripe_webhook_handler(
     headers: HeaderMap,
     body: String, // Raw body for signature verification
 ) -> Response {
-    println!("Received Stripe webhook...");
+    info!("Received Stripe webhook...");
 
     if !state.config.use_stripe {
         // Check if Stripe is enabled
@@ -102,7 +103,7 @@ pub async fn stripe_webhook_handler(
     let webhook_secret = match std::env::var("STRIPE_WEBHOOK_SECRET") {
         Ok(s) => s,
         Err(_) => {
-            eprintln!("🚨 STRIPE_WEBHOOK_SECRET environment variable not set!");
+            info!("🚨 STRIPE_WEBHOOK_SECRET environment variable not set!");
             return ConnectifyError::ConfigError(
                 "STRIPE_WEBHOOK_SECRET environment variable not set".to_string(),
             )
@@ -117,19 +118,19 @@ pub async fn stripe_webhook_handler(
 
     // Call the verification function from logic.rs
     if let Err(e) = verify_stripe_signature(&body.as_bytes(), sig_header, &webhook_secret) {
-        eprintln!("Stripe webhook signature verification failed: {:?}", e);
+        info!("Stripe webhook signature verification failed: {:?}", e);
         // Return 400 Bad Request for signature errors
         return ConnectifyError::from(e).into_response();
     }
 
-    println!("✅ Stripe webhook signature verified.");
+    info!("✅ Stripe webhook signature verified.");
 
     // --- Process Payload ---
     // Deserialize the raw body into StripeEvent AFTER signature verification
     let event: StripeEvent = match serde_json::from_str(&body) {
         Ok(ev) => ev,
         Err(e) => {
-            eprintln!("Failed to deserialize Stripe webhook event: {}", e);
+            info!("Failed to deserialize Stripe webhook event: {}", e);
             return ConnectifyError::ParseError(format!("Invalid webhook payload: {}", e))
                 .into_response();
         }
@@ -140,11 +141,11 @@ pub async fn stripe_webhook_handler(
     // Call the processing logic from logic.rs
     match process_stripe_webhook(event, app_config.clone()).await {
         Ok(()) => {
-            println!("Stripe webhook processed successfully.");
+            info!("Stripe webhook processed successfully.");
             StatusCode::OK.into_response() // Return 200 OK to Stripe
         }
         Err(e) => {
-            eprintln!("Error processing Stripe webhook: {}", e);
+            info!("Error processing Stripe webhook: {}", e);
             // Convert StripeError to ConnectifyError and then to a Response
             ConnectifyError::from(e).into_response()
         }
@@ -175,14 +176,14 @@ pub async fn stripe_checkout_success_handler(
     State(state): State<Arc<StripeState>>,
     Query(params): Query<StripeRedirectQuery>,
 ) -> Redirect {
-    println!(
+    info!(
         "User redirected to Stripe success URL. Session ID: {:?}",
         params.session_id
     );
     let session_id = params
         .session_id
         .unwrap_or_else(|| "unknown_session".to_string());
-    println!(
+    info!(
         "User redirected to Stripe success. Session ID: {}",
         session_id
     );
@@ -214,7 +215,7 @@ pub async fn stripe_checkout_success_handler(
 pub async fn stripe_checkout_cancel_handler(
     Query(params): Query<StripeRedirectQuery>,
 ) -> Html<&'static str> {
-    println!(
+    info!(
         "User redirected to Stripe cancel URL. Session ID: {:?}",
         params.session_id
     );
@@ -256,7 +257,7 @@ pub async fn get_checkout_session_details_handler(
     map_json_error(
         get_checkout_session_details(&query.session_id).await,
         |err| {
-            eprintln!("Error retrieving Stripe session details: {}", err);
+            info!("Error retrieving Stripe session details: {}", err);
             err.into() // Convert StripeError to ConnectifyError using the From implementation
         },
     )
@@ -267,7 +268,7 @@ pub async fn admin_get_checkout_session_details_handler(
     State(state): State<Arc<StripeState>>,
     Query(query): Query<GetSessionDetailsQuery>, // Assuming same query params
 ) -> Result<Json<StripeCheckoutSessionData>, Response> {
-    println!(
+    info!(
         "[ADMIN] Request to get Stripe session details: {:?}",
         query.session_id
     );
@@ -284,7 +285,7 @@ pub async fn admin_get_checkout_session_details_handler(
     map_json_error(
         crate::logic::get_checkout_session_details(&query.session_id).await,
         |err| {
-            eprintln!("[ADMIN] Error retrieving Stripe session details: {}", err);
+            info!("[ADMIN] Error retrieving Stripe session details: {}", err);
             err.into() // Convert StripeError to ConnectifyError using the From implementation
         },
     )
@@ -308,7 +309,7 @@ pub async fn admin_list_checkout_sessions_handler(
     State(state): State<Arc<StripeState>>,
     Query(query_params): Query<ListSessionsAdminQuery>,
 ) -> Result<Json<ListSessionsAdminResponse>, Response> {
-    println!(
+    info!(
         "[ADMIN] Listing Stripe Checkout Sessions. Params: {:?}",
         query_params
     );
@@ -323,7 +324,7 @@ pub async fn admin_list_checkout_sessions_handler(
 
     // Use map_json_error to convert StripeError to ConnectifyError and then to a Response
     map_json_error(list_checkout_sessions_admin(query_params).await, |err| {
-        eprintln!("[ADMIN] Error listing Stripe sessions: {}", err);
+        info!("[ADMIN] Error listing Stripe sessions: {}", err);
         err.into() // Convert StripeError to ConnectifyError using the From implementation
     })
 }

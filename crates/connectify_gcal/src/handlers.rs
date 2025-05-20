@@ -1,5 +1,6 @@
 // File: crates/connectify_gcal/src/handlers.rs
 // use google_calendar3::api::Event;
+use tracing::info;
 use crate::logic::{
     calculate_available_slots, create_calendar_event, delete_calendar_event, get_booked_events,
     mark_event_cancelled, AvailabilityQuery, AvailableSlotsResponse, BookSlotRequest,
@@ -48,11 +49,11 @@ pub async fn get_availability_handler(
     }
 
     let gcal_config = state.config.gcal.as_ref().ok_or_else(|| {
-        eprintln!("GCal configuration missing in AppConfig.");
+        info!("GCal configuration missing in AppConfig.");
         (StatusCode::INTERNAL_SERVER_ERROR, "Server configuration error: GCal config missing.".to_string())
     })?;
     let calendar_id = gcal_config.calendar_id.as_ref().ok_or_else(|| {
-        eprintln!("GCal calendar_id missing in GcalConfig.");
+        info!("GCal calendar_id missing in GcalConfig.");
         (StatusCode::INTERNAL_SERVER_ERROR, "Server configuration error: GCal calendar ID missing.".to_string())
     })?;
 
@@ -60,7 +61,7 @@ pub async fn get_availability_handler(
     // Price tiers are assumed to be in StripeConfig for now.
     // This could be moved to a more generic "ServicePricingConfig" if needed.
     let stripe_config = state.config.stripe.as_ref().ok_or_else(|| {
-        eprintln!("Stripe configuration (for price tiers) missing in AppConfig.");
+        info!("Stripe configuration (for price tiers) missing in AppConfig.");
         (StatusCode::INTERNAL_SERVER_ERROR, "Pricing configuration error on server.".to_string())
     })?;
 
@@ -68,7 +69,7 @@ pub async fn get_availability_handler(
         .find(|tier| tier.duration_minutes == query.duration_minutes)
         .ok_or_else(|| {
             let err_msg = format!("No service offered for {} minute duration.", query.duration_minutes);
-            eprintln!("{}", err_msg);
+            info!("{}", err_msg);
             (StatusCode::BAD_REQUEST, err_msg)
         })?;
 
@@ -106,7 +107,7 @@ pub async fn get_availability_handler(
     ).await {
         Ok(periods) => periods,
         Err(e) => {
-            eprintln!("Error fetching GCal free/busy: {}", e);
+            info!("Error fetching GCal free/busy: {}", e);
             return Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to query calendar availability".to_string()));
         }
     };
@@ -179,7 +180,7 @@ pub async fn book_slot_handler(
     )
     .await
     .map_err(|e| {
-        eprintln!("Error checking availability: {}", e);
+        info!("Error checking availability: {}", e);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             "Failed to check slot availability".to_string(),
@@ -212,7 +213,7 @@ pub async fn book_slot_handler(
     .await
     {
         Ok(created_event) => {
-            println!("Successfully created event: {:?}", created_event.id);
+            info!("Successfully created event: {:?}", created_event.id);
             Ok(Json(BookingResponse {
                 success: true,
                 event_id: created_event.id, // Send back the Google Calendar event ID
@@ -227,7 +228,7 @@ pub async fn book_slot_handler(
             ))
         }
         Err(e) => {
-            eprintln!("Error booking slot: {}", e);
+            info!("Error booking slot: {}", e);
             Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Failed to book appointment.".to_string(),
@@ -266,7 +267,7 @@ pub async fn delete_event_handler(
             message: "Event deleted successfully.".to_string(),
         })),
         Err(e) => {
-            eprintln!("Error deleting event: {}", e);
+            info!("Error deleting event: {}", e);
             match e {
                 GcalError::ApiError(error) => {
                     // Handle specific error codes if needed
@@ -317,7 +318,7 @@ pub async fn mark_booking_cancelled_handler(
             message: "Appointment marked as cancelled successfully.".to_string(),
         })),
         Err(e) => {
-            eprintln!("Error marking event as cancelled: {}", e);
+            info!("Error marking event as cancelled: {}", e);
             match e {
                 GcalError::ApiError(error) => {
                     // Handle specific error codes if needed
@@ -397,7 +398,7 @@ pub async fn get_booked_events_handler(
     {
         Ok(events) => Ok(Json(BookedEventsResponse { events })),
         Err(e) => {
-            eprintln!("Error fetching booked events: {}", e);
+            info!("Error fetching booked events: {}", e);
             Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Failed to fetch booked events".to_string(),

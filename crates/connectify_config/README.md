@@ -55,7 +55,7 @@ use connectify_config::load_config;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = load_config()?;
-    println!("Loaded config: {:#?}", config);
+    info!("Loaded config: {:#?}", config);
     // Use config.server.host, config.server.port, etc.
     Ok(())
 }

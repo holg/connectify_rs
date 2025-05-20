@@ -1,7 +1,7 @@
 // --- File: crates/connectify_adhoc/src/handlers.rs ---
 use axum::{
     extract::State,
-    response::{Json, IntoResponse}, // Added Html, Response
+    response::{Json}, //, IntoResponse}, // Added Html, Response
     http::StatusCode,
 };
 use std::sync::Arc;

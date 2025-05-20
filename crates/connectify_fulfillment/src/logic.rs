@@ -1,5 +1,6 @@
 // --- File: crates/connectify_fulfillment/src/logic.rs ---
 
+use tracing::{info, warn};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use connectify_config::{GcalConfig}; // To access GCal config
@@ -103,7 +104,7 @@ pub async fn fulfill_gcal_booking_logic(
     // For now, let's create it here for simplicity, assuming gcal_config has key_path.
 ) -> Result<FulfillmentResponse, FulfillmentError> {
 
-    println!("Attempting to fulfill GCal booking: {:?}", payload.summary);
+    info!("Attempting to fulfill GCal booking: {:?}", payload.summary);
 
     // 1. Create the CalendarHub instance
     // This requires the GcalConfig to have the necessary details (key_path)
@@ -128,7 +129,7 @@ pub async fn fulfill_gcal_booking_logic(
     ).await {
         Ok(created_event) => {
             let event_id = created_event.id;
-            println!("Successfully booked GCal event. ID: {:?}", event_id);
+            info!("Successfully booked GCal event. ID: {:?}", event_id);
             Ok(FulfillmentResponse {
                 success: true,
                 message: "Google Calendar event booked successfully.".to_string(),
@@ -137,11 +138,11 @@ pub async fn fulfill_gcal_booking_logic(
             })
         }
         Err(GcalError::Conflict) => {
-            eprintln!("GCal booking conflict for summary: {}", payload.summary);
+            warn!("GCal booking conflict for summary: {}", payload.summary);
             Err(FulfillmentError::GcalBookingConflict)
         }
         Err(e) => {
-            eprintln!("Error booking GCal event: {}", e);
+            info!("Error booking GCal event: {}", e);
             Err(FulfillmentError::GcalApiError(e.to_string()))
         }
     }
@@ -167,7 +168,7 @@ pub async fn fulfill_adhoc_gcal_twilio_logic(
     gcal_config: &GcalConfig,
     payload: AdhocGcalTwilioFulfillmentRequest,
 ) -> Result<FulfillmentResponse, FulfillmentError> {
-    println!("[Fulfillment Logic] Attempting Adhoc GCal booking for room: {}, summary: {}", payload.room_name, payload.summary);
+    info!("[Fulfillment Logic] Attempting Adhoc GCal booking for room: {}, summary: {}", payload.room_name, payload.summary);
 
     let calendar_id_to_use = gcal_config.calendar_id.as_ref().ok_or_else(|| FulfillmentError::ConfigError("Missing GCal calendar_id in config for adhoc booking".to_string()))?;
 
@@ -184,7 +185,7 @@ pub async fn fulfill_adhoc_gcal_twilio_logic(
     match gcal_create_event(&hub, calendar_id_to_use, gcal_book_request).await {
         Ok(created_event) => {
             let event_id = created_event.id;
-            println!("[Fulfillment Logic] Successfully booked Adhoc GCal event. ID: {:?}, Room: {}", event_id, payload.room_name);
+            info!("[Fulfillment Logic] Successfully booked Adhoc GCal event. ID: {:?}, Room: {}", event_id, payload.room_name);
             Ok(FulfillmentResponse {
                 success: true,
                 message: "Adhoc Google Calendar event booked successfully.".to_string(),
@@ -193,11 +194,11 @@ pub async fn fulfill_adhoc_gcal_twilio_logic(
             })
         }
         Err(GcalError::Conflict) => {
-            eprintln!("[Fulfillment Logic] Adhoc GCal booking conflict for summary: {}", payload.summary);
+            info!("[Fulfillment Logic] Adhoc GCal booking conflict for summary: {}", payload.summary);
             Err(FulfillmentError::GcalBookingConflict)
         }
         Err(e) => {
-            eprintln!("[Fulfillment Logic] Error booking Adhoc GCal event: {}", e);
+            info!("[Fulfillment Logic] Error booking Adhoc GCal event: {}", e);
             Err(FulfillmentError::GcalApiError(e.to_string()))
         }
     }
@@ -208,7 +209,7 @@ pub async fn fulfill_adhoc_gcal_twilio_logic(
     _gcal_config: &GcalConfig,
     _payload: AdhocGcalTwilioFulfillmentRequest,
 ) -> Result<FulfillmentResponse, FulfillmentError> {
-    eprintln!("[Fulfillment Logic] GCal feature not enabled. Cannot fulfill Adhoc GCal booking.");
+    info!("[Fulfillment Logic] GCal feature not enabled. Cannot fulfill Adhoc GCal booking.");
     Err(FulfillmentError::FeatureDisabled("GCal feature not enabled".to_string()))
 }
 

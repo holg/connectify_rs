@@ -3,14 +3,14 @@ use std::fs;
 use std::path::Path;
 use serde_json::Value;
 use connectify_config::secrets;
-
+use tracing::{info};
 fn main() {
     let args: Vec<String> = env::args().collect();
     
     if args.len() < 3 {
-        println!("Usage: migrate_config <source_file> <target_file>");
-        println!("Migrates configuration from source file to target file format.");
-        println!("Example: migrate_config config/old_config.yml config/new_config.yml");
+        info!("Usage: migrate_config <source_file> <target_file>");
+        info!("Migrates configuration from source file to target file format.");
+        info!("Example: migrate_config config/old_config.yml config/new_config.yml");
         return;
     }
     
@@ -19,10 +19,10 @@ fn main() {
     
     match migrate_config(source_path, target_path) {
         Ok(_) => {
-            println!("Successfully migrated configuration from {} to {}", source_path, target_path);
+            info!("Successfully migrated configuration from {} to {}", source_path, target_path);
         }
         Err(err) => {
-            eprintln!("Error migrating configuration: {}", err);
+            info!("Error migrating configuration: {}", err);
             std::process::exit(1);
         }
     }

@@ -1,5 +1,6 @@
 // --- File: crates/connectify_payrexx/src/logic.rs ---
 #![allow(dead_code)] // Allow dead code for doc functions as long as they are not used, bcs of WIP
+use tracing::info;
 use chrono::Utc;
 use connectify_config::PayrexxConfig; // Use config types from connectify_config
 use serde::{Deserialize, Serialize};
@@ -283,7 +284,7 @@ pub async fn create_gateway_request(
     config: &PayrexxConfig,
     request_data: CreateGatewayRequest,
 ) -> Result<CreateGatewayResponse, PayrexxError> {
-    println!("Initiating Payrexx gateway creation (Form Encoded)...");
+    info!("Initiating Payrexx gateway creation (Form Encoded)...");
 
     // Determine final values
     let amount = request_data
@@ -347,7 +348,7 @@ pub async fn create_gateway_request(
         config.instance_name
     );
 
-    println!("Sending POST request to Payrexx API: {}", api_url);
+    info!("Sending POST request to Payrexx API: {}", api_url);
 
     // --- Make the API Call ---
     let response = HTTP_CLIENT
@@ -363,9 +364,9 @@ pub async fn create_gateway_request(
     let status = response.status();
     let body_text = response.text().await?;
 
-    println!("Payrexx API response status: {}", status);
+    info!("Payrexx API response status: {}", status);
     if !status.is_success() {
-        println!("Payrexx API response body (raw): {}", body_text);
+        info!("Payrexx API response body (raw): {}", body_text);
     }
 
     // --- Parse Response (Still JSON) ---
@@ -374,7 +375,7 @@ pub async fn create_gateway_request(
 
         if payrexx_response.status == "success" {
             if let Some(gateway_data) = payrexx_response.data.first() {
-                println!(
+                info!(
                     "Payrexx gateway created successfully. Link: {}",
                     gateway_data.link
                 );
@@ -382,7 +383,7 @@ pub async fn create_gateway_request(
                     url: gateway_data.link.clone(),
                 })
             } else {
-                eprintln!("Payrexx API success status but missing data/link in response.");
+                info!("Payrexx API success status but missing data/link in response.");
                 Err(PayrexxError::InternalError(
                     "Payrexx response missing gateway link".to_string(),
                 ))
@@ -391,7 +392,7 @@ pub async fn create_gateway_request(
             let error_message = payrexx_response
                 .message
                 .unwrap_or_else(|| "Unknown Payrexx API error".to_string());
-            eprintln!(
+            info!(
                 "Payrexx API reported error. Status: {}, Message: {}",
                 payrexx_response.status, error_message
             );
@@ -401,7 +402,7 @@ pub async fn create_gateway_request(
             })
         }
     } else {
-        eprintln!(
+        info!(
             "Payrexx API request failed with HTTP status: {}. Body: {}",
             status, body_text
         );
@@ -427,7 +428,7 @@ pub fn verify_payrexx_signature(
 ) -> Result<(), PayrexxError> {
     // TODO: Implement actual signature verification based on Payrexx docs.
 
-    println!("⚠️ WARNING: Payrexx webhook signature verification is NOT implemented!");
+    info!("⚠️ WARNING: Payrexx webhook signature verification is NOT implemented!");
     Ok(())
 }
 
@@ -437,10 +438,10 @@ pub async fn process_webhook(
     // Add other dependencies if needed (e.g., database access, GCal client)
     // db_pool: &SqlitePool,
 ) -> Result<(), PayrexxError> {
-    println!("Processing webhook event type: {:?}", payload.event_type);
+    info!("Processing webhook event type: {:?}", payload.event_type);
 
     if let Some(transaction) = payload.transaction {
-        println!(
+        info!(
             "Transaction ID: {:?}, Status: {:?}",
             transaction.id, transaction.status
         );
@@ -448,38 +449,38 @@ pub async fn process_webhook(
         // Handle based on transaction status
         match transaction.status.as_deref() {
             Some("confirmed") => {
-                println!(
+                info!(
                     "✅ Payment confirmed for reference: {:?}",
                     transaction.reference_id
                 );
                 // TODO: Implement actions for successful payment
             }
             Some("waiting") => {
-                println!("⏳ Payment waiting for confirmation.");
+                info!("⏳ Payment waiting for confirmation.");
             }
             Some("cancelled") => {
-                println!(
+                info!(
                     "❌ Payment cancelled for reference: {:?}",
                     transaction.reference_id
                 );
                 // TODO: Update order status if needed.
             }
             Some("failed") => {
-                println!(
+                info!(
                     "❌ Payment failed for reference: {:?}",
                     transaction.reference_id
                 );
                 // TODO: Update order status if needed.
             }
             Some(other_status) => {
-                println!("ℹ️ Received unhandled transaction status: {}", other_status);
+                info!("ℹ️ Received unhandled transaction status: {}", other_status);
             }
             None => {
-                println!("⚠️ Webhook received without transaction status.");
+                info!("⚠️ Webhook received without transaction status.");
             }
         }
     } else {
-        println!("⚠️ Webhook received without transaction data.");
+        info!("⚠️ Webhook received without transaction data.");
     }
 
     Ok(())

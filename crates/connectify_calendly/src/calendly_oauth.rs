@@ -77,7 +77,7 @@ pub async fn exchange_code_for_token(
         .request_async(&async_http_client)
         .await
         .map_err(|e| {
-            eprintln!("Failed to exchange Calendly code: {:?}", e);
+            info!("Failed to exchange Calendly code: {:?}", e);
             error::ErrorInternalServerError("OAuth token exchange failed")
         })?;
 
@@ -107,27 +107,27 @@ fn extract_csrf_state_fallback(req: &HttpRequest, expected: &str) -> Option<(Coo
     let cookie_header = req.headers().get(header::COOKIE)?;
     let cookie_str = cookie_header.to_str().ok()?;
 
-    eprintln!("🍪 Full raw Cookie header: {cookie_str}");
+    info!("🍪 Full raw Cookie header: {cookie_str}");
 
     for pair in cookie_str.split(';') {
         let trimmed = pair.trim();
-        eprintln!("➡️ Checking cookie pair: {trimmed}");
+        info!("➡️ Checking cookie pair: {trimmed}");
 
         if let Ok(cookie) = Cookie::parse_encoded(trimmed) {
-            eprintln!("🔍 Parsed cookie: {} = {}", cookie.name(), cookie.value());
+            info!("🔍 Parsed cookie: {} = {}", cookie.name(), cookie.value());
 
             if cookie.name() == CSRF_COOKIE_NAME {
                 let cookie_val = cookie.value().trim_matches('"').trim();
                 if cookie_val == expected {
-                    eprintln!("✅ Fallback CSRF matched cookie == query param.");
+                    info!("✅ Fallback CSRF matched cookie == query param.");
                     jar.add_original(cookie.clone().into_owned());
                     return Some((jar, cookie_val.to_string()));
                 } else {
-                    eprintln!("❌ Fallback CSRF mismatch: cookie_val != expected: {cookie_val} != {expected}");
+                    info!("❌ Fallback CSRF mismatch: cookie_val != expected: {cookie_val} != {expected}");
                 }
             }
         } else {
-            eprintln!("⚠️ Failed to parse cookie: {trimmed}");
+            info!("⚠️ Failed to parse cookie: {trimmed}");
         }
     }
 
@@ -178,7 +178,7 @@ pub async fn calendly_auth_callback(
 
     let (_jar, stored_state) = extract_csrf_state(&req, &csrf_key)
         .or_else(|| {
-            eprintln!("⚠️ Using unsigned fallback CSRF cookie for dev/testing.");
+            info!("⚠️ Using unsigned fallback CSRF cookie for dev/testing.");
             extract_csrf_state_fallback(&req, "trdt")
         })
         .ok_or_else(|| error::ErrorBadRequest("CSRF state not found or invalid"))?;
@@ -222,9 +222,9 @@ pub fn print_calendly_oauth_url(config: &AppConfig) {
             "https://auth.calendly.com/oauth/authorize?client_id={}&response_type=code&redirect_uri={}&scope=default&state={}",
             &client_id.as_str(), urlencoding::encode(redirect_uri), state
         );
-        println!("🔐 Calendly OAuth Start URL:\n{}", url);
+        info!("🔐 Calendly OAuth Start URL:\n{}", url);
     } else {
-        eprintln!("Missing calendly_client_id or calendly_redirect_uri in config");
+        info!("Missing calendly_client_id or calendly_redirect_uri in config");
     }
 }
 pub async fn refresh_calendly_token(

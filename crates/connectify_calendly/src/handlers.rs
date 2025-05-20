@@ -66,7 +66,7 @@ pub async fn calendly_auth_callback(
 
     let (_jar, stored_state) = extract_csrf_state(&req, &csrf_key)
         .or_else(|| {
-            eprintln!("⚠️ Using unsigned fallback CSRF cookie for dev/testing.");
+            info!("⚠️ Using unsigned fallback CSRF cookie for dev/testing.");
             extract_csrf_state_fallback(&req, "trdt")
         })
         .ok_or_else(|| error::ErrorBadRequest("CSRF state not found or invalid"))?;
@@ -112,12 +112,12 @@ pub async fn get_available_slots(
     query: web::Query<SlotsQuery>,
 ) -> ActixResult<impl Responder> {
     let token = get_default_user_token(&config).await?;
-    println!("Fetching available slots for user: {}", token);
+    info!("Fetching available slots for user: {}", token);
     let (start_date, end_date) = calculate_date_range(&query);
     let user_uri = fetch_calendly_user_url(&state, &token).await?;
     let event_types = fetch_event_types(&state, &token, &user_uri).await?;
     for e in &event_types {
-        println!("Event: {} (URI: {})", e.name, e.uri);
+        info!("Event: {} (URI: {})", e.name, e.uri);
     }
     let mut all_slots = Vec::new();
     for event in event_types {
@@ -157,7 +157,7 @@ pub async fn book_slot(
         "start_time": start_time
     });
 
-    println!("📤 Booking with payload: {}", body);
+    info!("📤 Booking with payload: {}", body);
 
     let res = state
         .client
@@ -171,7 +171,7 @@ pub async fn book_slot(
         Ok(resp) => {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            eprintln!("📥 Calendly response body: {}", body);
+            info!("📥 Calendly response body: {}", body);
             if status.is_success() {
                 Ok(HttpResponse::Ok().body(body))
             } else {

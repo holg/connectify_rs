@@ -50,11 +50,11 @@
 //                 Err((StatusCode::INTERNAL_SERVER_ERROR, "Payrexx configuration error on server.".to_string()))
 //             }
 //             Err(PayrexxError::RequestError(e)) => {
-//                 eprintln!("Payrexx Reqwest Error: {}", e);
+//                 info!("Payrexx Reqwest Error: {}", e);
 //                 Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to communicate with payment provider.".to_string()))
 //             }
 //             Err(PayrexxError::ParseError(e)) => {
-//                 eprintln!("Payrexx Parse Error: {}", e);
+//                 info!("Payrexx Parse Error: {}", e);
 //                 Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to understand payment provider response.".to_string()))
 //             }
 //             Err(PayrexxError::ApiError { status, message }) => {

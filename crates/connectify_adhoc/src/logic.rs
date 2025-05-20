@@ -1,7 +1,8 @@
 // --- File: crates/connectify_adhoc/src/logic.rs ---
 
+use tracing::info;
 use std::sync::Arc;
-use connectify_config::{AppConfig, StripeConfig, GcalConfig, PriceTier, AdhocSessionSettings};
+use connectify_config::{AppConfig}; //, StripeConfig, GcalConfig, PriceTier, AdhocSessionSettings};
 use chrono::{Utc, Duration};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -17,7 +18,7 @@ use connectify_gcal::auth::HubType as GcalHubType; // If passing an existing hub
 use connectify_stripe::logic::{
     create_checkout_session as stripe_create_checkout_session,
     CreateCheckoutSessionRequest as StripeCreateCheckoutRequest,
-    CreateCheckoutSessionResponse as StripeCreateCheckoutResponse
+    // CreateCheckoutSessionResponse as StripeCreateCheckoutResponse
 };
 #[cfg(feature = "stripe")]
 use connectify_stripe::error::StripeError;
@@ -139,11 +140,11 @@ pub async fn initiate_adhoc_session_logic(
                 }
             }
         }
-        println!("[Adhoc Logic] Slot from {} to {} is available.", effective_start_time, effective_end_time);
+        info!("[Adhoc Logic] Slot from {} to {} is available.", effective_start_time, effective_end_time);
     }
     #[cfg(not(feature = "gcal"))]
     {
-        println!("[Adhoc Logic] GCal feature not enabled, skipping availability check.");
+        info!("[Adhoc Logic] GCal feature not enabled, skipping availability check.");
         // If GCal is not enabled, you might want to always allow or have a different check.
         // For now, we'll proceed assuming it's available if GCal feature is off.
     }

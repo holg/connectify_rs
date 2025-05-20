@@ -3,6 +3,7 @@
 //!
 //! This module provides an implementation of the CalendarService trait for Google Calendar.
 
+use tracing::info;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use connectify_common::services::{
@@ -86,7 +87,7 @@ impl CalendarService for GoogleCalendarService {
     ///     ).await?;
     ///
     ///     for (start, end) in busy_times {
-    ///         println!("Busy from {} to {}", start, end);
+    ///         info!("Busy from {} to {}", start, end);
     ///     }
     ///     
     ///     Ok(())
@@ -126,7 +127,7 @@ impl CalendarService for GoogleCalendarService {
                             if let (Some(start_dt), Some(end_dt)) = (period.start, period.end) {
                                 busy_periods.push((start_dt, end_dt));
                             } else {
-                                eprintln!(
+                                info!(
                                     "Warning: Skipping busy period with missing start/end: {:?}",
                                     period
                                 );
@@ -184,7 +185,7 @@ impl CalendarService for GoogleCalendarService {
     ///     };
     ///
     ///     let result = calendar_service.create_event("primary", event).await?;
-    ///     println!("Created event with ID: {:?}, status: {}", result.event_id, result.status);
+    ///     info!("Created event with ID: {:?}, status: {}", result.event_id, result.status);
     ///     
     ///     Ok(())
     /// }
@@ -423,7 +424,7 @@ impl CalendarService for GoogleCalendarService {
     ///     
     ///     // Mark an event as cancelled without notifying attendees
     ///     let result = calendar_service.mark_event_cancelled("primary", "event123", false).await?;
-    ///     println!("Event {} marked as {}", result.event_id.unwrap_or_default(), result.status);
+    ///     info!("Event {} marked as {}", result.event_id.unwrap_or_default(), result.status);
     ///
     ///     // Mark an event as cancelled and notify all attendees
     ///     let result = calendar_service.mark_event_cancelled("primary", "event456", true).await?;
@@ -515,7 +516,7 @@ impl CalendarService for GoogleCalendarService {
     ///     ).await?;
     ///
     ///     for event in events {
-    ///         println!("Event: {}, Start: {}, Status: {}", 
+    ///         info!("Event: {}, Start: {}, Status: {}",
     ///                  event.summary, event.start_time, event.status);
     ///     }
     ///

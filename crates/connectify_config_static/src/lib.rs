@@ -4,8 +4,9 @@ use std::env;
 use std::path::PathBuf;
 use serde_json::{Value};
 pub mod models;
-use dotenv;
+// use dotenv;
 pub use models::*;
+use tracing::{info};
 
 pub fn load_config() -> Result<AppConfig, ConfigError> {
     ensure_dotenv_loaded();
@@ -23,16 +24,16 @@ pub fn load_config() -> Result<AppConfig, ConfigError> {
     let default_path = workspace_root.join("config/default");
     let env_path = workspace_root.join(format!("config/{}", run_env));
 
-    eprintln!("build.rs: workspace_root: {}", workspace_root.display());
-    eprintln!("build.rs: default_path: {}", default_path.display());
-    eprintln!("build.rs: env_path: {}", env_path.display());
+    info!("build.rs: workspace_root: {}", workspace_root.display());
+    info!("build.rs: default_path: {}", default_path.display());
+    info!("build.rs: env_path: {}", env_path.display());
 
     let builder = Config::builder()
         .add_source(File::with_name(default_path.to_str().unwrap()).required(false))
         .add_source(File::with_name(env_path.to_str().unwrap()).required(false))
         .add_source(Environment::with_prefix(&prefix).separator("__"));
 
-    eprintln!("build.rs: starting config load builder: {builder:?}");
+    info!("build.rs: starting config load builder: {builder:?}");
 
     let raw_config: AppConfig = builder.build()?.try_deserialize()?;
     Ok(raw_config)
@@ -55,7 +56,7 @@ fn inject_env_secrets(value: &mut Value) {
                 if let Ok(env_val) = std::env::var(&env_key) {
                     *obj = Value::String(env_val);
                 } else {
-                    eprintln!("Warning: env var {} not found for secret_from_env", env_key);
+                    info!("Warning: env var {} not found for secret_from_env", env_key);
                 }
             }
             _ => {}

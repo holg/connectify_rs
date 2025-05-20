@@ -1,17 +1,17 @@
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use std::process::{Command, Child};
 use std::time::Duration;
 use notify::{Watcher, RecursiveMode, watcher};
 use std::sync::mpsc::channel;
-
+use tracing::{info};
 fn main() {
     let args: Vec<String> = env::args().collect();
     
     if args.len() < 2 {
-        println!("Usage: config_watcher <command> [args...]");
-        println!("Watches for changes in configuration files and restarts the command when they change.");
-        println!("Example: config_watcher cargo run --bin connectify-backend");
+        info!("Usage: config_watcher <command> [args...]");
+        info!("Watches for changes in configuration files and restarts the command when they change.");
+        info!("Example: config_watcher cargo run --bin connectify-backend");
         return;
     }
     
@@ -23,8 +23,8 @@ fn main() {
     let config_dir = env::var("CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
     let config_path = PathBuf::from(&config_dir);
     
-    println!("Watching for changes in {}", config_path.display());
-    println!("Running command: {} {}", command, command_args.join(" "));
+    info!("Watching for changes in {}", config_path.display());
+    info!("Running command: {} {}", command, command_args.join(" "));
     
     // Create a channel to receive events
     let (tx, rx) = channel();
@@ -42,24 +42,24 @@ fn main() {
     loop {
         match rx.recv() {
             Ok(event) => {
-                println!("Config change detected: {:?}", event);
+                info!("Config change detected: {:?}", event);
                 
                 // Kill the current process
                 if let Err(err) = child.kill() {
-                    println!("Failed to kill process: {}", err);
+                    info!("Failed to kill process: {}", err);
                 }
                 
                 // Wait for the process to exit
                 if let Err(err) = child.wait() {
-                    println!("Failed to wait for process: {}", err);
+                    info!("Failed to wait for process: {}", err);
                 }
                 
                 // Restart the command
-                println!("Restarting command: {} {}", command, command_args.join(" "));
+                info!("Restarting command: {} {}", command, command_args.join(" "));
                 child = start_command(command, &command_args);
             }
             Err(err) => {
-                println!("Watch error: {}", err);
+                info!("Watch error: {}", err);
                 break;
             }
         }

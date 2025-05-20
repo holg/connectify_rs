@@ -1,3 +1,4 @@
+use tracing::info;
 use std::env;
 use std::fmt;
 use std::fs;
@@ -136,9 +137,9 @@ fn get_encryption_key() -> Result<[u8; 32], SecretError> {
     let key_b64 = general_purpose::STANDARD.encode(&key);
     fs::write(&key_path, &key_b64)?;
     
-    println!("Generated new encryption key and saved to {}", key_path);
-    println!("For production, set the CONNECTIFY_ENCRYPTION_KEY environment variable to:");
-    println!("{}", key_b64);
+    info!("Generated new encryption key and saved to {}", key_path);
+    info!("For production, set the CONNECTIFY_ENCRYPTION_KEY environment variable to:");
+    info!("{}", key_b64);
     
     Ok(key)
 }
@@ -311,13 +312,13 @@ pub fn encrypt_config_file(file_path: &str) -> Result<(), SecretError> {
 /// Command-line tool for encrypting configuration files
 pub fn encrypt_config_command(args: &[String]) -> Result<(), SecretError> {
     if args.len() < 2 {
-        println!("Usage: encrypt_config <file_path>");
+        info!("Usage: encrypt_config <file_path>");
         return Ok(());
     }
     
     let file_path = &args[1];
     encrypt_config_file(file_path)?;
     
-    println!("Successfully encrypted configuration file: {}", file_path);
+    info!("Successfully encrypted configuration file: {}", file_path);
     Ok(())
 }

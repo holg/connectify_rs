@@ -3,21 +3,22 @@
 //!
 //! This module provides an implementation of the ServiceFactory trait for the backend service.
 
-use std::sync::Arc;
 use chrono::{DateTime, Utc};
-use connectify_common::services::{
-    BookedEvent, BoxedError, CalendarEvent, CalendarEventResult, CalendarService, NotificationService, 
-    NotificationResult, PaymentIntentResult, PaymentService, RefundResult, ServiceFactory,
-};
 use connectify_common::is_feature_enabled;
+use connectify_common::services::{
+    BookedEvent, BoxedError, CalendarEvent, CalendarEventResult, CalendarService,
+    NotificationResult, NotificationService, PaymentIntentResult, PaymentService, RefundResult,
+    ServiceFactory,
+};
 use connectify_config::AppConfig;
+use std::sync::Arc;
 #[allow(unused_imports)] // the warning is due to unused imports not recognozied by rustfmt
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 #[cfg(feature = "gcal")]
 use connectify_gcal::{
     auth::create_calendar_hub,
-    service::{GoogleCalendarService, GcalServiceError},
+    service::{GcalServiceError, GoogleCalendarService},
 };
 
 #[cfg(feature = "stripe")]
@@ -111,12 +112,23 @@ impl ConnectifyServiceFactory {
                                 calendar_id: &str,
                                 start_time: DateTime<Utc>,
                                 end_time: DateTime<Utc>,
-                            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<(DateTime<Utc>, DateTime<Utc>)>, Self::Error>> + Send + '_>> {
+                            ) -> std::pin::Pin<
+                                Box<
+                                    dyn std::future::Future<
+                                            Output = Result<
+                                                Vec<(DateTime<Utc>, DateTime<Utc>)>,
+                                                Self::Error,
+                                            >,
+                                        > + Send
+                                        + '_,
+                                >,
+                            > {
                                 let calendar_id = calendar_id.to_string();
                                 let inner = &self.inner;
 
                                 Box::pin(async move {
-                                    inner.get_busy_times(&calendar_id, start_time, end_time)
+                                    inner
+                                        .get_busy_times(&calendar_id, start_time, end_time)
                                         .await
                                         .map_err(|e| BoxedError(Box::new(e)))
                                 })
@@ -126,13 +138,21 @@ impl ConnectifyServiceFactory {
                                 &self,
                                 calendar_id: &str,
                                 event: CalendarEvent,
-                            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<CalendarEventResult, Self::Error>> + Send + '_>> {
+                            ) -> std::pin::Pin<
+                                Box<
+                                    dyn std::future::Future<
+                                            Output = Result<CalendarEventResult, Self::Error>,
+                                        > + Send
+                                        + '_,
+                                >,
+                            > {
                                 let calendar_id = calendar_id.to_string();
                                 let event = event.clone();
                                 let inner = &self.inner;
 
                                 Box::pin(async move {
-                                    inner.create_event(&calendar_id, event)
+                                    inner
+                                        .create_event(&calendar_id, event)
                                         .await
                                         .map_err(|e| BoxedError(Box::new(e)))
                                 })
@@ -143,13 +163,20 @@ impl ConnectifyServiceFactory {
                                 calendar_id: &str,
                                 event_id: &str,
                                 notify_attendees: bool,
-                            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Self::Error>> + Send + '_>> {
+                            ) -> std::pin::Pin<
+                                Box<
+                                    dyn std::future::Future<Output = Result<(), Self::Error>>
+                                        + Send
+                                        + '_,
+                                >,
+                            > {
                                 let calendar_id = calendar_id.to_string();
                                 let event_id = event_id.to_string();
                                 let inner = &self.inner;
 
                                 Box::pin(async move {
-                                    inner.delete_event(&calendar_id, &event_id, notify_attendees)
+                                    inner
+                                        .delete_event(&calendar_id, &event_id, notify_attendees)
                                         .await
                                         .map_err(|e| BoxedError(Box::new(e)))
                                 })
@@ -160,13 +187,25 @@ impl ConnectifyServiceFactory {
                                 calendar_id: &str,
                                 event_id: &str,
                                 notify_attendees: bool,
-                            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<CalendarEventResult, Self::Error>> + Send + '_>> {
+                            ) -> std::pin::Pin<
+                                Box<
+                                    dyn std::future::Future<
+                                            Output = Result<CalendarEventResult, Self::Error>,
+                                        > + Send
+                                        + '_,
+                                >,
+                            > {
                                 let calendar_id = calendar_id.to_string();
                                 let event_id = event_id.to_string();
                                 let inner = &self.inner;
 
                                 Box::pin(async move {
-                                    inner.mark_event_cancelled(&calendar_id, &event_id, notify_attendees)
+                                    inner
+                                        .mark_event_cancelled(
+                                            &calendar_id,
+                                            &event_id,
+                                            notify_attendees,
+                                        )
                                         .await
                                         .map_err(|e| BoxedError(Box::new(e)))
                                 })
@@ -178,12 +217,25 @@ impl ConnectifyServiceFactory {
                                 start_time: DateTime<Utc>,
                                 end_time: DateTime<Utc>,
                                 include_cancelled: bool,
-                            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<BookedEvent>, Self::Error>> + Send + '_>> {
+                            ) -> std::pin::Pin<
+                                Box<
+                                    dyn std::future::Future<
+                                            Output = Result<Vec<BookedEvent>, Self::Error>,
+                                        > + Send
+                                        + '_,
+                                >,
+                            > {
                                 let calendar_id = calendar_id.to_string();
                                 let inner = &self.inner;
 
                                 Box::pin(async move {
-                                    inner.get_booked_events(&calendar_id, start_time, end_time, include_cancelled)
+                                    inner
+                                        .get_booked_events(
+                                            &calendar_id,
+                                            start_time,
+                                            end_time,
+                                            include_cancelled,
+                                        )
                                         .await
                                         .map_err(|e| BoxedError(Box::new(e)))
                                 })
@@ -223,14 +275,27 @@ impl ConnectifyServiceFactory {
                         currency: &str,
                         description: Option<&str>,
                         metadata: Option<serde_json::Value>,
-                    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<PaymentIntentResult, Self::Error>> + Send + '_>> {
+                    ) -> std::pin::Pin<
+                        Box<
+                            dyn std::future::Future<
+                                    Output = Result<PaymentIntentResult, Self::Error>,
+                                > + Send
+                                + '_,
+                        >,
+                    > {
                         let currency = currency.to_string();
                         let description = description.map(|s| s.to_string());
                         let metadata = metadata.clone();
                         let inner = &self.inner;
 
                         Box::pin(async move {
-                            inner.create_payment_intent(amount, &currency, description.as_deref(), metadata.clone())
+                            inner
+                                .create_payment_intent(
+                                    amount,
+                                    &currency,
+                                    description.as_deref(),
+                                    metadata.clone(),
+                                )
                                 .await
                                 .map_err(|e| BoxedError(Box::new(e)))
                         })
@@ -239,12 +304,20 @@ impl ConnectifyServiceFactory {
                     fn confirm_payment_intent(
                         &self,
                         payment_intent_id: &str,
-                    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<PaymentIntentResult, Self::Error>> + Send + '_>> {
+                    ) -> std::pin::Pin<
+                        Box<
+                            dyn std::future::Future<
+                                    Output = Result<PaymentIntentResult, Self::Error>,
+                                > + Send
+                                + '_,
+                        >,
+                    > {
                         let payment_intent_id = payment_intent_id.to_string();
                         let inner = &self.inner;
 
                         Box::pin(async move {
-                            inner.confirm_payment_intent(&payment_intent_id)
+                            inner
+                                .confirm_payment_intent(&payment_intent_id)
                                 .await
                                 .map_err(|e| BoxedError(Box::new(e)))
                         })
@@ -253,12 +326,20 @@ impl ConnectifyServiceFactory {
                     fn cancel_payment_intent(
                         &self,
                         payment_intent_id: &str,
-                    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<PaymentIntentResult, Self::Error>> + Send + '_>> {
+                    ) -> std::pin::Pin<
+                        Box<
+                            dyn std::future::Future<
+                                    Output = Result<PaymentIntentResult, Self::Error>,
+                                > + Send
+                                + '_,
+                        >,
+                    > {
                         let payment_intent_id = payment_intent_id.to_string();
                         let inner = &self.inner;
 
                         Box::pin(async move {
-                            inner.cancel_payment_intent(&payment_intent_id)
+                            inner
+                                .cancel_payment_intent(&payment_intent_id)
                                 .await
                                 .map_err(|e| BoxedError(Box::new(e)))
                         })
@@ -269,13 +350,20 @@ impl ConnectifyServiceFactory {
                         payment_intent_id: &str,
                         amount: Option<i64>,
                         reason: Option<&str>,
-                    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<RefundResult, Self::Error>> + Send + '_>> {
+                    ) -> std::pin::Pin<
+                        Box<
+                            dyn std::future::Future<Output = Result<RefundResult, Self::Error>>
+                                + Send
+                                + '_,
+                        >,
+                    > {
                         let payment_intent_id = payment_intent_id.to_string();
                         let reason = reason.map(|s| s.to_string());
                         let inner = &self.inner;
 
                         Box::pin(async move {
-                            inner.create_refund(&payment_intent_id, amount, reason.as_deref())
+                            inner
+                                .create_refund(&payment_intent_id, amount, reason.as_deref())
                                 .await
                                 .map_err(|e| BoxedError(Box::new(e)))
                         })
@@ -309,14 +397,22 @@ impl ConnectifyServiceFactory {
                         subject: &str,
                         body: &str,
                         is_html: bool,
-                    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<NotificationResult, Self::Error>> + Send + '_>> {
+                    ) -> std::pin::Pin<
+                        Box<
+                            dyn std::future::Future<
+                                    Output = Result<NotificationResult, Self::Error>,
+                                > + Send
+                                + '_,
+                        >,
+                    > {
                         let to = to.to_string();
                         let subject = subject.to_string();
                         let body = body.to_string();
                         let inner = &self.inner;
 
                         Box::pin(async move {
-                            inner.send_email(&to, &subject, &body, is_html)
+                            inner
+                                .send_email(&to, &subject, &body, is_html)
                                 .await
                                 .map_err(|e| BoxedError(Box::new(e)))
                         })
@@ -326,13 +422,21 @@ impl ConnectifyServiceFactory {
                         &self,
                         to: &str,
                         body: &str,
-                    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<NotificationResult, Self::Error>> + Send + '_>> {
+                    ) -> std::pin::Pin<
+                        Box<
+                            dyn std::future::Future<
+                                    Output = Result<NotificationResult, Self::Error>,
+                                > + Send
+                                + '_,
+                        >,
+                    > {
                         let to = to.to_string();
                         let body = body.to_string();
                         let inner = &self.inner;
 
                         Box::pin(async move {
-                            inner.send_sms(&to, &body)
+                            inner
+                                .send_sms(&to, &body)
                                 .await
                                 .map_err(|e| BoxedError(Box::new(e)))
                         })

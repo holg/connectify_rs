@@ -13,7 +13,7 @@ use std::{
     env,
     time::{SystemTime, UNIX_EPOCH},
 };
-
+use tracing::info;
 use connectify_config::AppConfig;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -74,7 +74,7 @@ pub async fn generate_token(
     // Check if the optional twilio config section exists
     let Some(twilio_conf) = config.twilio.as_ref() else {
         let err_msg = "Twilio configuration section missing in server config.".to_string();
-        eprintln!("{}", err_msg);
+        info!("{}", err_msg);
         // Return Axum error tuple
         return Err((StatusCode::INTERNAL_SERVER_ERROR, err_msg));
     };
@@ -82,7 +82,7 @@ pub async fn generate_token(
     // Check the runtime flag
     if !config.use_twilio {
         let err_msg = "Twilio service is disabled by configuration.".to_string();
-        eprintln!("{}", err_msg);
+        info!("{}", err_msg);
         return Err((StatusCode::SERVICE_UNAVAILABLE, err_msg));
     }
 
@@ -90,7 +90,7 @@ pub async fn generate_token(
         Some(twilio_conf) => twilio_conf.api_key_secret.clone(),
         None => {
             let err_msg = "Missing TWILIO Config.".to_string();
-            eprintln!("{}", err_msg);
+            info!("{}", err_msg);
             return Err((StatusCode::INTERNAL_SERVER_ERROR, err_msg));
         }
     };
@@ -125,7 +125,7 @@ pub async fn generate_token(
         },
     };
 
-    println!(
+    info!(
         "DEBUG: Generating token with iss(SK): {}, sub(AC): {}",
         claims.iss, claims.sub
     );
@@ -148,7 +148,7 @@ pub async fn generate_token(
         Err(e) => {
             // On failure, log error and return Axum error tuple
             let err_msg = format!("Error generating token: {}", e);
-            eprintln!("{}", err_msg);
+            info!("{}", err_msg);
             Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Failed to generate token".to_string(),

@@ -1,5 +1,6 @@
 // --- File: crates/connectify_fulfillment/src/auth.rs ---
 
+use tracing::{info, warn};
 use axum::{
     extract::State,
     body::Body as AxumBody,
@@ -36,7 +37,7 @@ where
     let expected_secret_as_str: String = match auth_state.config.fulfillment.as_ref().and_then(|f_cfg| f_cfg.shared_secret.clone()) {
         Some(secret) => secret,
         None => {
-            eprintln!("🚨 Fulfillment shared secret not configured in AppConfig!");
+            warn!("🚨 Fulfillment shared secret not configured in AppConfig!");
             return (StatusCode::INTERNAL_SERVER_ERROR, "Server configuration error for fulfillment auth.".to_string()).into_response();
         }
     };
@@ -54,15 +55,15 @@ where
             // Both are now &str, so .as_bytes() will work correctly
             if constant_time_eq(provided_secret_val.as_bytes(), expected_secret_as_str.as_bytes()) {
                 // Token is valid, proceed to the next handler
-                println!("✅ Fulfillment request authenticated successfully.");
+                info!("✅ Fulfillment request authenticated successfully.");
                 next.run(req).await // This already returns a Response
             } else {
-                eprintln!("🚨 Fulfillment request: Invalid secret provided.");
+                warn!("🚨 Fulfillment request: Invalid secret provided.");
                 (StatusCode::UNAUTHORIZED, "Unauthorized: Invalid credentials.".to_string()).into_response()
             }
         }
         None => {
-            eprintln!("🚨 Fulfillment request: Missing '{}' header.", INTERNAL_AUTH_HEADER);
+            warn!("🚨 Fulfillment request: Missing '{}' header.", INTERNAL_AUTH_HEADER);
             (StatusCode::UNAUTHORIZED, format!("Unauthorized: Missing {} header.", INTERNAL_AUTH_HEADER)).into_response()
         }
     }

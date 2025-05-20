@@ -3,6 +3,7 @@ use connectify_config::{AppConfig, StripeConfig}; //, PriceTier};
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use tracing::{error, info};
 #[allow(unused_imports)]
 #[cfg(feature = "openapi")]
 use serde_json::json;
@@ -154,7 +155,7 @@ pub fn verify_stripe_signature(
         StripeError::WebhookSignatureError("Missing Stripe-Signature header".to_string())
     })?;
     // Debug: Log the received signature header
-    println!("[DEBUG] Stripe-Signature Header: {}", sig_header_value);
+    info!("[DEBUG] Stripe-Signature Header: {}", sig_header_value);
     let mut timestamp_str: Option<&str> = None;
     let mut v1_signatures_hex: Vec<&str> = Vec::new();
 
@@ -188,8 +189,8 @@ pub fn verify_stripe_signature(
         ));
     }
     // Debug: Log parsed components
-    println!("[DEBUG] Parsed Timestamp (t): {}", parsed_timestamp);
-    println!(
+    info!("[DEBUG] Parsed Timestamp (t): {}", parsed_timestamp);
+    info!(
         "[DEBUG] Provided Signatures (v1 list): {:?}",
         v1_signatures_hex
     );
@@ -201,7 +202,7 @@ pub fn verify_stripe_signature(
         .as_secs() as i64;
     const TOLERANCE_SECONDS: i64 = 600; // 10 minutes
     if (current_timestamp - parsed_timestamp).abs() > TOLERANCE_SECONDS {
-        eprintln!(
+        info!(
             "[WARN] Timestamp outside tolerance. Current: {}, Event: {}, Diff: {}",
             current_timestamp,
             parsed_timestamp,
@@ -216,7 +217,7 @@ pub fn verify_stripe_signature(
         timestamp_str.unwrap(), // Use the original string timestamp from header
         String::from_utf8_lossy(payload_bytes)
     );
-    println!("[DEBUG] String to Sign: '{}'", signed_payload_string);
+    info!("[DEBUG] String to Sign: '{}'", signed_payload_string);
 
     type HmacSha256 = Hmac<Sha256>;
     let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).map_err(|_| {
@@ -227,7 +228,7 @@ pub fn verify_stripe_signature(
     let calculated_signature_hex = hex::encode(expected_signature_bytes);
 
     // Debug: Log calculated signature
-    println!("[DEBUG] Calculated Signature: {}", calculated_signature_hex);
+    info!("[DEBUG] Calculated Signature: {}", calculated_signature_hex);
 
     // ** Iterate through all provided v1 signatures and check for a match **
     for provided_sig_hex in v1_signatures_hex {
@@ -239,7 +240,7 @@ pub fn verify_stripe_signature(
         }
     }
     // If no match was found after checking all v1 signatures
-    eprintln!(
+    info!(
         "[ERROR] Stripe signature mismatch. Calculated: {}, Provided in header did not match.",
         calculated_signature_hex
     );
@@ -263,7 +264,7 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 pub async fn process_stripe_webhook(
     event: StripeEvent,
     app_config: Arc<AppConfig>, ) -> Result<(), StripeError> {
-    println!("Processing Stripe event type: {}", event.event_type);
+    info!("Processing Stripe event type: {}", event.event_type);
 
     match event.event_type.as_str() {
         "checkout.session.completed" => {
@@ -275,13 +276,13 @@ pub async fn process_stripe_webhook(
                     ))
                 })?;
 
-            println!("Checkout Session ID: {}", session.id);
-            println!("Payment Status: {:?}", session.payment_status);
-            println!("Metadata: {:?}", session.metadata);
-            println!("Client Reference ID: {:?}", session.client_reference_id);
+            info!("Checkout Session ID: {}", session.id);
+            info!("Payment Status: {:?}", session.payment_status);
+            info!("Metadata: {:?}", session.metadata);
+            info!("Client Reference ID: {:?}", session.client_reference_id);
 
             if session.payment_status.as_deref() == Some("paid") {
-                println!(
+                info!(
                     "✅ Payment for Checkout Session {} was successful.",
                     session.id
                 );
@@ -321,7 +322,7 @@ pub async fn process_stripe_webhook(
                             "adhoc_gcal_twilio" => "/api/fulfill/adhoc-gcal-twilio",
                             // "twilio_session" => "/api/fulfill/twilio-session", // Example
                             _ => {
-                                eprintln!(
+                                info!(
                                     "[Stripe Webhook] Unknown fulfillment_type in metadata: {}",
                                     ff_type
                                 );
@@ -334,7 +335,7 @@ pub async fn process_stripe_webhook(
                         let fulfillment_url =
                             format!("{}{}", fulfillment_base_url, fulfillment_endpoint_path);
 
-                        println!("[Stripe Webhook] Calling fulfillment service at {} for type '{}', session {}", fulfillment_url, ff_type, session.id);
+                        info!("[Stripe Webhook] Calling fulfillment service at {} for type '{}', session {}", fulfillment_url, ff_type, session.id);
 
                         let client = HTTP_CLIENT.clone(); // Use the static client
                         match client
@@ -345,14 +346,14 @@ pub async fn process_stripe_webhook(
                             .await
                         {
                             Ok(resp) if resp.status().is_success() => {
-                                println!("[Stripe Webhook] Fulfillment for session {} (type: {}) triggered successfully.", session.id, ff_type);
+                                info!("[Stripe Webhook] Fulfillment for session {} (type: {}) triggered successfully.", session.id, ff_type);
                             }
                             Ok(resp) => {
                                 let status = resp.status(); // Store the status before consuming the response
                                 let err_text = resp.text().await.unwrap_or_else(|_| {
                                     "Unknown error from fulfillment service".to_string()
                                 });
-                                eprintln!("[Stripe Webhook] Fulfillment call for session {} (type: {}) failed: {} - {}", session.id, ff_type, status, err_text);
+                                info!("[Stripe Webhook] Fulfillment call for session {} (type: {}) failed: {} - {}", session.id, ff_type, status, err_text);
                                 return Err(StripeError::FulfillmentError(format!(
                                     "Fulfillment service call failed: {} - {}",
                                     status,
@@ -360,7 +361,7 @@ pub async fn process_stripe_webhook(
                                 )));
                             }
                             Err(e) => {
-                                eprintln!("[Stripe Webhook] Error calling fulfillment service for session {}: {}", session.id, e);
+                                info!("[Stripe Webhook] Error calling fulfillment service for session {}: {}", session.id, e);
                                 return Err(StripeError::FulfillmentError(format!(
                                     "Error calling fulfillment service: {}",
                                     e
@@ -368,33 +369,33 @@ pub async fn process_stripe_webhook(
                             }
                         }
                     } else {
-                        eprintln!("[Stripe Webhook] Fulfillment shared secret not configured. Cannot call fulfillment service for session {}.", session.id);
+                        info!("[Stripe Webhook] Fulfillment shared secret not configured. Cannot call fulfillment service for session {}.", session.id);
                         return Err(StripeError::ConfigError);
                     }
                 } else {
-                    println!("[Stripe Webhook] Missing 'ff_type' or 'ff_data_json' in metadata for session {}. Cannot trigger fulfillment.", session.id);
+                    info!("[Stripe Webhook] Missing 'ff_type' or 'ff_data_json' in metadata for session {}. Cannot trigger fulfillment.", session.id);
                     // Decide if this is an error or just no fulfillment needed
                     return Err(StripeError::MissingFulfillmentData);
                 }
             } else {
-                println!("ℹ️ Checkout session {} completed, but payment status is: {:?}. No fulfillment action taken.", session.id, session.payment_status);
+                info!("ℹ️ Checkout session {} completed, but payment status is: {:?}. No fulfillment action taken.", session.id, session.payment_status);
             }
         }
         "payment_intent.succeeded" => {
             let payment_intent_id: Option<&str> =
                 event.data.object.get("id").and_then(|v| v.as_str());
-            println!("PaymentIntent succeeded: {:?}", payment_intent_id);
+            info!("PaymentIntent succeeded: {:?}", payment_intent_id);
             // You might handle this if you're working directly with PaymentIntents
         }
         "payment_intent.payment_failed" => {
             let payment_intent_id: Option<&str> =
                 event.data.object.get("id").and_then(|v| v.as_str());
-            println!("PaymentIntent failed: {:?}", payment_intent_id);
+            info!("PaymentIntent failed: {:?}", payment_intent_id);
             // Handle failed payment attempts if necessary
         }
         // Add more event types as needed
         _ => {
-            println!("Received unhandled Stripe event type: {}", event.event_type);
+            info!("Received unhandled Stripe event type: {}", event.event_type);
         }
     }
     Ok(())
@@ -406,7 +407,7 @@ pub async fn create_checkout_session(
     stripe_config: &StripeConfig,
     request_data: CreateCheckoutSessionRequest,
 ) -> Result<CreateCheckoutSessionResponse, StripeError> {
-    println!("[Stripe Logic] Creating Checkout Session for fulfillment type: {}", request_data.fulfillment_type);
+    info!("[Stripe Logic] Creating Checkout Session for fulfillment type: {}", request_data.fulfillment_type);
 
     let stripe_secret_key = env::var("STRIPE_SECRET_KEY").map_err(|_| StripeError::ConfigError)?;
 
@@ -445,7 +446,7 @@ pub async fn create_checkout_session(
             stripe_config.default_currency.clone().unwrap_or_else(|| "chf".to_string())
         ).to_lowercase();
 
-        println!("[Stripe Logic] Type: {}. Duration: {} mins. Tier: amount={}, product='{}', currency='{}'",
+        info!("[Stripe Logic] Type: {}. Duration: {} mins. Tier: amount={}, product='{}', currency='{}'",
                  request_data.fulfillment_type, duration_minutes, unit_amount, product_name, currency);
 
     } else {
@@ -478,9 +479,9 @@ pub async fn create_checkout_session(
 
     let api_url = "https://api.stripe.com/v1/checkout/sessions";
 
-    println!("[Stripe Logic] Sending request to Stripe API: {}", api_url);
+    info!("[Stripe Logic] Sending request to Stripe API: {}", api_url);
     // For debugging form body:
-    // println!("[Stripe Logic] Form Body: {:?}", form_body);
+    // info!("[Stripe Logic] Form Body: {:?}", form_body);
 
     let response = HTTP_CLIENT
         .post(api_url)
@@ -492,18 +493,18 @@ pub async fn create_checkout_session(
     let status = response.status();
     let body_text = response.text().await?;
 
-    println!("[Stripe Logic] Stripe API response status: {}", status);
+    info!("[Stripe Logic] Stripe API response status: {}", status);
     if !status.is_success() {
-        println!("[Stripe Logic] Stripe API response body (raw): {}", body_text);
+        info!("[Stripe Logic] Stripe API response body (raw): {}", body_text);
     }
 
     if status.is_success() {
         let stripe_response: StripeCheckoutSessionApiResponse = serde_json::from_str(&body_text)?;
         if let Some(url) = stripe_response.url {
-            println!("[Stripe Logic] Stripe Checkout Session created successfully. URL: {}", url);
+            info!("[Stripe Logic] Stripe Checkout Session created successfully. URL: {}", url);
             Ok(CreateCheckoutSessionResponse { url, session_id: stripe_response.id })
         } else {
-            eprintln!("[Stripe Logic] Stripe response missing checkout session URL: {}", body_text);
+            info!("[Stripe Logic] Stripe response missing checkout session URL: {}", body_text);
             Err(StripeError::InternalError("Stripe response missing checkout URL".to_string()))
         }
     } else {
@@ -511,7 +512,7 @@ pub async fn create_checkout_session(
             Ok(json_body) => json_body.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str()).unwrap_or(&body_text).to_string(),
             Err(_) => body_text,
         };
-        eprintln!("[Stripe Logic] Stripe API request failed with HTTP status: {}. Message: {}", status, error_message);
+        info!("[Stripe Logic] Stripe API request failed with HTTP status: {}. Message: {}", status, error_message);
         Err(StripeError::ApiError { status_code: status.as_u16(), message: error_message })
     }
 }
@@ -553,7 +554,7 @@ pub async fn get_checkout_session_details(
     session_id: &str,
     // stripe_config: &StripeConfig, // Not strictly needed if secret key is from env
 ) -> Result<StripeCheckoutSessionData, StripeError> {
-    println!("[Stripe Logic] Retrieving Checkout Session details for ID: {}", session_id);
+    info!("[Stripe Logic] Retrieving Checkout Session details for ID: {}", session_id);
 
     let stripe_secret_key = env::var("STRIPE_SECRET_KEY")
         .map_err(|_| StripeError::ConfigError)?;
@@ -574,7 +575,7 @@ pub async fn get_checkout_session_details(
         // Optionally, verify payment_status here if needed for the confirmation page
         if session_data.payment_status.as_deref() != Some("paid") && session_data.status.as_deref() != Some("complete") {
             // This might happen if user hits success URL but payment is still processing or failed later
-            println!("[Stripe Logic] Warning: Checkout session {} status is {:?}, payment_status is {:?}.",
+            info!("[Stripe Logic] Warning: Checkout session {} status is {:?}, payment_status is {:?}.",
                      session_id, session_data.status, session_data.payment_status);
             // Depending on requirements, you might return an error or different data
         }
@@ -584,7 +585,7 @@ pub async fn get_checkout_session_details(
             Ok(json_body) => json_body.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str()).unwrap_or(&body_text).to_string(),
             Err(_) => body_text,
         };
-        eprintln!("[Stripe Logic] Failed to retrieve session {}: {} - {}", session_id, status, error_message);
+        error!("[Stripe Logic] Failed to retrieve session {}: {} - {}", session_id, status, error_message);
         Err(StripeError::ApiError { status_code: status.as_u16(), message: error_message })
     }
 }
@@ -623,7 +624,7 @@ pub type ListSessionsAdminResponse = StripeListObject<StripeCheckoutSessionData>
 pub async fn list_checkout_sessions_admin(
     query_params: ListSessionsAdminQuery,
 ) -> Result<ListSessionsAdminResponse, StripeError> {
-    println!("[Stripe Logic] Listing Checkout Sessions for admin. Params: {:?}", query_params);
+    info!("[Stripe Logic] Listing Checkout Sessions for admin. Params: {:?}", query_params);
 
     let stripe_secret_key = env::var("STRIPE_SECRET_KEY")
         .map_err(|_| StripeError::ConfigError)?;
@@ -662,7 +663,7 @@ pub async fn list_checkout_sessions_admin(
             Ok(json_body) => json_body.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str()).unwrap_or(&body_text).to_string(),
             Err(_) => body_text,
         };
-        eprintln!("[Stripe Logic] Failed to list sessions: {} - {}", status, error_message);
+        error!("[Stripe Logic] Failed to list sessions: {} - {}", status, error_message);
         Err(StripeError::ApiError { status_code: status.as_u16(), message: error_message })
     }
 }

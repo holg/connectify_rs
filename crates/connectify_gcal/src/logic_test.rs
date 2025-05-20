@@ -2,7 +2,7 @@
 mod tests {
     use crate::logic::calculate_available_slots;
     use chrono::{DateTime, Datelike, Duration, NaiveTime, TimeDelta, TimeZone, Utc, Weekday};
-
+    use tracing::{info};
     #[test]
     fn test_calculate_available_slots_no_busy_periods() {
         // Test case: No busy periods, should return slots at regular intervals
@@ -37,10 +37,10 @@ mod tests {
             assert!(!slots.is_empty(), "Should have available slots on a working day");
 
             // Check that slots are within working hours
-            println!("Slots: {:?}", slots);
+            info!("Slots: {:?}", slots);
             for slot in &slots {
                 let slot_time = slot.time();
-                println!("Slot time: {:?}, work_start: {:?}, work_end: {:?}", slot_time, work_start, work_end);
+                info!("Slot time: {:?}, work_start: {:?}, work_end: {:?}", slot_time, work_start, work_end);
                 assert!(slot_time >= work_start && slot_time <= work_end,
                     "Slot should be within working hours: {:?}", slot);
             }

@@ -1,13 +1,13 @@
 // --- File: crates/connectify_fulfillment/src/handlers.rs ---
 
+use tracing::{info, warn};
 use axum::{
     extract::{State},
-    response::{IntoResponse, Json},
+    response::{Json},
     http::StatusCode,
 };
 use std::sync::Arc;
 use connectify_config::AppConfig; // To access shared configuration
-use serde::Deserialize; // For request body deserialization
 
 // Import logic functions and request/response types
 use crate::logic::{
@@ -56,7 +56,7 @@ pub async fn handle_gcal_booking_fulfillment(
     Json(payload): Json<GcalBookingFulfillmentRequest>,
 ) -> Result<Json<FulfillmentResponse>, (StatusCode, String)> {
 
-    println!("[Fulfillment Handler] Received GCal booking fulfillment request: {:?}", payload.summary);
+    info!("[Fulfillment Handler] Received GCal booking fulfillment request: {:?}", payload.summary);
 
     // TODO: Implement Authentication for this internal endpoint.
     // Check shared secret from state.config.fulfillment.shared_secret
@@ -67,25 +67,25 @@ pub async fn handle_gcal_booking_fulfillment(
     }
 
     let gcal_config = state.config.gcal.as_ref().ok_or_else(|| {
-        eprintln!("[Fulfillment Handler] GCal configuration missing in AppConfig for fulfillment.");
+        info!("[Fulfillment Handler] GCal configuration missing in AppConfig for fulfillment.");
         (StatusCode::INTERNAL_SERVER_ERROR, "Server configuration error for GCal".to_string())
     })?;
 
     // If you decide to pass the GcalState (and thus the pre-initialized Hub) to the logic function:
     // let gcal_hub_to_use = state.gcal_state_for_fulfillment.as_ref()
     //     .ok_or_else(|| {
-    //         eprintln!("[Fulfillment Handler] GcalState (and Hub) not available for fulfillment.");
+    //         info!("[Fulfillment Handler] GcalState (and Hub) not available for fulfillment.");
     //         (StatusCode::INTERNAL_SERVER_ERROR, "GCal client not initialized for fulfillment.".to_string())
     //     })?.calendar_hub.clone(); // Clone the Arc<HubType>
 
     // For now, fulfill_gcal_booking_logic creates its own hub from gcal_config
     match fulfill_gcal_booking_logic(gcal_config, payload).await {
         Ok(response) => {
-            println!("[Fulfillment Handler] GCal booking fulfillment successful: {:?}", response.event_id);
+            info!("[Fulfillment Handler] GCal booking fulfillment successful: {:?}", response.event_id);
             Ok(Json(response))
         }
         Err(e) => {
-            eprintln!("[Fulfillment Handler] GCal booking fulfillment failed: {}", e);
+            info!("[Fulfillment Handler] GCal booking fulfillment failed: {}", e);
             match e {
                 FulfillmentError::GcalApiError(api_err_msg) => Err((StatusCode::BAD_GATEWAY, format!("Google Calendar API error: {}", api_err_msg))),
                 FulfillmentError::GcalBookingConflict => Err((StatusCode::CONFLICT, "Booking conflict in Google Calendar.".to_string())),
@@ -118,7 +118,7 @@ pub async fn handle_adhoc_gcal_twilio_fulfillment(
     Json(payload): Json<AdhocGcalTwilioFulfillmentRequest>,
 ) -> Result<Json<FulfillmentResponse>, (StatusCode, String)> {
 
-    println!("[Fulfillment Handler] Received Adhoc GCal/Twilio fulfillment request for room: {}", payload.room_name);
+    info!("[Fulfillment Handler] Received Adhoc GCal/Twilio fulfillment request for room: {}", payload.room_name);
 
     // Check if GCal is enabled in the main app config (needed for booking the slot)
     if !state.config.use_gcal {
@@ -131,18 +131,18 @@ pub async fn handle_adhoc_gcal_twilio_fulfillment(
 
 
     let gcal_config = state.config.gcal.as_ref().ok_or_else(|| {
-        eprintln!("[Fulfillment Handler] GCal configuration missing for adhoc fulfillment.");
+        warn!("[Fulfillment Handler] GCal configuration missing for adhoc fulfillment.");
         (StatusCode::INTERNAL_SERVER_ERROR, "Server configuration error for GCal (adhoc)".to_string())
     })?;
 
     // Call the adhoc fulfillment logic
     match fulfill_adhoc_gcal_twilio_logic(gcal_config, payload).await {
         Ok(response) => {
-            println!("[Fulfillment Handler] Adhoc GCal booking successful: Event ID {:?}, Room: {:?}", response.event_id, response.room_name);
+            info!("[Fulfillment Handler] Adhoc GCal booking successful: Event ID {:?}, Room: {:?}", response.event_id, response.room_name);
             Ok(Json(response))
         }
         Err(e) => {
-            eprintln!("[Fulfillment Handler] Adhoc GCal booking failed: {}", e);
+            warn!("[Fulfillment Handler] Adhoc GCal booking failed: {}", e);
             match e {
                 FulfillmentError::GcalApiError(api_err_msg) => Err((StatusCode::BAD_GATEWAY, format!("Google Calendar API error: {}", api_err_msg))),
                 FulfillmentError::GcalBookingConflict => Err((StatusCode::CONFLICT, "Booking conflict in Google Calendar for adhoc session.".to_string())),

@@ -5,6 +5,7 @@
 //! with consistent naming patterns and for converting between different naming
 //! patterns.
 
+use tracing::info;
 use std::env;
 
 /// The default prefix for configuration environment variables
@@ -196,7 +197,7 @@ pub fn inject_env_vars(value: &mut serde_json::Value) -> bool {
                     *s = env_val;
                     replaced = true;
                 } else {
-                    eprintln!("Warning: env var for {} not found", path_str);
+                    info!("Warning: env var for {} not found", path_str);
                 }
             }
             _ => {}

@@ -36,3 +36,4 @@ thiserror = { workspace = true }
 reqwest = { workspace = true }
 utoipa = { workspace = true, optional = true }
 utoipa-swagger-ui = { workspace = true, optional = true }
+tracing = {workspace = true}

@@ -155,7 +155,7 @@ pub fn calculate_available_slots(
         let end_time_of_day = potential_end_time.time(); // Need to check end time too
 
         // Debug print to help diagnose issues
-        // println!("Checking slot: {:?}, day: {:?}, time: {:?}, end_time: {:?}",
+        // info!("Checking slot: {:?}, day: {:?}, time: {:?}, end_time: {:?}",
         //          potential_start_time, day_of_week, time_of_day, end_time_of_day);
 
         if !working_days.contains(&day_of_week) ||

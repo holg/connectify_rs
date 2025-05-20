@@ -502,6 +502,7 @@ dependencies = [
  "serde_yaml",
  "thiserror",
  "toml",
+ "tracing",
  "utoipa",
  "utoipa-swagger-ui",
 ]
@@ -515,6 +516,7 @@ dependencies = [
  "once_cell",
  "serde",
  "serde_json",
+ "tracing",
  "utoipa",
  "utoipa-swagger-ui",
 ]
@@ -622,6 +624,7 @@ dependencies = [
  "reqwest",
  "serde",
  "thiserror",
+ "tracing",
  "utoipa",
  "utoipa-swagger-ui",
 ]

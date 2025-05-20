@@ -1,5 +1,6 @@
 // --- File: crates/connectify_fulfillment/src/routes.rs ---
 
+use tracing::info;
 use axum::{
     routing::post,
     Router,
@@ -40,7 +41,7 @@ pub fn routes(
     {
         // Check runtime config flags before adding routes
         if config.use_gcal && config.gcal.is_some() { // For standard GCal booking
-            println!("💡 Fulfillment: Adding /fulfill/gcal-booking route.");
+            info!("💡 Fulfillment: Adding /fulfill/gcal-booking route.");
             fulfillment_api_router = fulfillment_api_router.route(
                 "/fulfill/gcal-booking",
                 post(handle_gcal_booking_fulfillment)
@@ -48,7 +49,7 @@ pub fn routes(
         }
         // For adhoc GCal booking (which also relies on GCal config and use_adhoc_sessions flag)
         if config.use_adhoc && config.adhoc_settings.as_ref().map_or(false, |s| s.admin_enabled) && config.gcal.is_some() {
-            println!("💡 Fulfillment: Adding /fulfill/adhoc-gcal-twilio route.");
+            info!("💡 Fulfillment: Adding /fulfill/adhoc-gcal-twilio route.");
             fulfillment_api_router = fulfillment_api_router.route(
                 "/fulfill/adhoc-gcal-twilio", // New route for adhoc
                 post(handle_adhoc_gcal_twilio_fulfillment)

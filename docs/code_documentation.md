@@ -186,7 +186,7 @@ Example:
 //!     let end_time = start_time + chrono::Duration::days(7);
 //!
 //!     let busy_times = calendar_service.get_busy_times(calendar_id, start_time, end_time).await.unwrap();
-//!     println!("Busy times: {:?}", busy_times);
+//!     info!("Busy times: {:?}", busy_times);
 //! }
 //! ```
 ```
@@ -264,8 +264,8 @@ where
 /// use connectify_config::load_config;
 ///
 /// let config = load_config().expect("Failed to load configuration");
-/// println!("Server host: {}", config.server.host);
-/// println!("Server port: {}", config.server.port);
+/// info!("Server host: {}", config.server.host);
+/// info!("Server port: {}", config.server.port);
 /// ```
 pub fn load_config() -> Result<AppConfig, ConfigurationError> {
     // Implementation...
