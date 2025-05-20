@@ -79,6 +79,7 @@ pub trait CalendarService: Send + Sync {
     ) -> BoxFuture<'_, CalendarEventResult, Self::Error>;
 
     /// Get booked events within a specified time range.
+    #[allow(clippy::type_complexity)]
     fn get_booked_events(
         &self,
         calendar_id: &str,
@@ -163,7 +164,6 @@ pub trait ServiceFactory: Send + Sync {
 }
 
 /// Data structures for calendar service operations.
-/// Represents a calendar event to be created.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CalendarEvent {
     /// The start time of the event.

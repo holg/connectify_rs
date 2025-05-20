@@ -107,6 +107,26 @@ pub async fn get_busy_times(
     Ok(busy_periods)
 }
 
+/// Configuration for working hours and days
+pub struct WorkingHoursConfig<'a> {
+    /// Start time of the working day (e.g., 9:00 AM)
+    pub start_time: NaiveTime,
+    /// End time of the working day (e.g., 5:00 PM)
+    pub end_time: NaiveTime,
+    /// Days of the week when appointments can be scheduled
+    pub working_days: &'a [Weekday],
+}
+
+/// Configuration for appointment scheduling
+pub struct AppointmentConfig {
+    /// Duration of each appointment
+    pub duration: Duration,
+    /// Buffer time between appointments
+    pub buffer_time: Duration,
+    /// Time step for checking available slots
+    pub step: Duration,
+}
+
 /// Calculates available slots based on busy times, working hours, etc.
 /// THIS IS A COMPLEX SKELETON - NEEDS DETAILED IMPLEMENTATION
 #[allow(clippy::too_many_arguments)]

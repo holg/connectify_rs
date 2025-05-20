@@ -6,6 +6,7 @@
 // we'll just include placeholder tests for now.
 
 #[tokio::test]
+#[allow(clippy::assertions_on_constants)]
 async fn test_calendar_service_contract() {
     // This is a placeholder test that always passes
     // In a real implementation, this would test the basic calendar service contract:
@@ -17,6 +18,7 @@ async fn test_calendar_service_contract() {
 }
 
 #[tokio::test]
+#[allow(clippy::assertions_on_constants)]
 async fn test_calendar_service_conflict_handling() {
     // This is a placeholder test that always passes
     // In a real implementation, this would test conflict handling:
@@ -28,6 +30,7 @@ async fn test_calendar_service_conflict_handling() {
 }
 
 #[tokio::test]
+#[allow(clippy::assertions_on_constants)]
 async fn test_calendar_service_error_handling() {
     // This is a placeholder test that always passes
     // In a real implementation, this would test error handling:

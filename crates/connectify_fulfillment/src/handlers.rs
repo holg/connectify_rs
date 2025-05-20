@@ -6,8 +6,7 @@ use connectify_config::AppConfig;
 use std::sync::Arc;
 #[cfg(feature = "gcal")]
 use tracing::{info, warn}; // To access shared configuration
-
-// Import logic functions and request/response types
+                           // Import logic functions and request/response types
 #[cfg(feature = "gcal")]
 use crate::logic::{
     fulfill_adhoc_gcal_twilio_logic, fulfill_gcal_booking_logic, AdhocGcalTwilioFulfillmentRequest,
@@ -115,6 +114,8 @@ pub async fn handle_gcal_booking_fulfillment(
                     StatusCode::SERVICE_UNAVAILABLE,
                     format!("Required feature for fulfillment disabled: {}", msg),
                 )),
+                #[cfg(feature = "twilio")]
+                FulfillmentError::TwilioError(msg) => Err((StatusCode::INTERNAL_SERVER_ERROR, msg)),
                 FulfillmentError::InternalError(msg) => {
                     Err((StatusCode::INTERNAL_SERVER_ERROR, msg))
                 }
@@ -199,6 +200,8 @@ pub async fn handle_adhoc_gcal_twilio_fulfillment(
                     StatusCode::SERVICE_UNAVAILABLE,
                     format!("Required feature for fulfillment disabled: {}", msg),
                 )),
+                #[cfg(feature = "twilio")]
+                FulfillmentError::TwilioError(msg) => Err((StatusCode::INTERNAL_SERVER_ERROR, msg)),
                 FulfillmentError::InternalError(msg) => {
                     Err((StatusCode::INTERNAL_SERVER_ERROR, msg))
                 }

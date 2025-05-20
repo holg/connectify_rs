@@ -1,6 +1,5 @@
 // --- File: crates/connectify_adhoc/src/doc.rs ---
 #![allow(dead_code)]
-#![cfg(feature = "openapi")]
 use utoipa::OpenApi;
 // use serde_json::json;
 // Import all relevant schemas from logic.rs and handlers.rs

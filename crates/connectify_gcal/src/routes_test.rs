@@ -59,10 +59,6 @@ mod tests {
                 assert!(router.is_a_router());
             });
         });
-
-        // Just check that the function exists and can be called
-        // In a real test, you would check that it returns a properly configured router
-        assert!(true, "Routes function exists");
     }
 
     // Extension trait to check if a value is a Router

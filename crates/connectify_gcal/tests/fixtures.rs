@@ -49,25 +49,26 @@ pub fn create_busy_periods(
 /// Creates a mock AppConfig for testing
 pub fn create_mock_config() -> Arc<AppConfig> {
     // Create price tiers
-    let mut price_tiers = Vec::new();
-    price_tiers.push(PriceTier {
-        duration_minutes: 30,
-        unit_amount: 5000, // $50.00
-        currency: Some("USD".to_string()),
-        product_name: Some("30-minute consultation".to_string()),
-    });
-    price_tiers.push(PriceTier {
-        duration_minutes: 60,
-        unit_amount: 10000, // $100.00
-        currency: Some("USD".to_string()),
-        product_name: Some("60-minute consultation".to_string()),
-    });
-    price_tiers.push(PriceTier {
-        duration_minutes: 90,
-        unit_amount: 15000, // $150.00
-        currency: Some("USD".to_string()),
-        product_name: Some("90-minute consultation".to_string()),
-    });
+    let price_tiers = vec![
+        PriceTier {
+            duration_minutes: 30,
+            unit_amount: 5000, // $50.00
+            currency: Some("USD".to_string()),
+            product_name: Some("30-minute consultation".to_string()),
+        },
+        PriceTier {
+            duration_minutes: 60,
+            unit_amount: 10000, // $100.00
+            currency: Some("USD".to_string()),
+            product_name: Some("60-minute consultation".to_string()),
+        },
+        PriceTier {
+            duration_minutes: 90,
+            unit_amount: 15000, // $150.00
+            currency: Some("USD".to_string()),
+            product_name: Some("90-minute consultation".to_string()),
+        },
+    ];
 
     // Create Stripe config
     let stripe_config = StripeConfig {
@@ -113,6 +114,7 @@ pub fn create_mock_config() -> Arc<AppConfig> {
 }
 
 /// Creates working hours and days configuration for testing
+#[allow(dead_code)]
 pub fn create_working_hours_config() -> (NaiveTime, NaiveTime, [Weekday; 5]) {
     let work_start = NaiveTime::from_hms_opt(9, 0, 0).unwrap();
     let work_end = NaiveTime::from_hms_opt(17, 0, 0).unwrap();
@@ -128,6 +130,7 @@ pub fn create_working_hours_config() -> (NaiveTime, NaiveTime, [Weekday; 5]) {
 }
 
 /// Creates a date range for testing
+#[allow(dead_code)]
 pub fn create_date_range(
     start_offset_days: i64,
     duration_days: i64,

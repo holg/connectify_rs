@@ -3,9 +3,9 @@
 use serde::{Deserialize, Serialize};
 
 // #[cfg(feature = "openapi")]
-// use utoipa::ToSchema; // , IntoParams};
+// use utoipa::{ToSchema, PartialSchema}; // , IntoParams};
 // --- General Server Config ---
-#[cfg_attr(feature = "openapi", derive(utoipa::{ToSchema}))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ServerConfig {
     pub host: String,
@@ -30,7 +30,7 @@ pub struct TwilioConfig {
     // Secret loaded directly from env var: TWILIO_API_KEY_SECRET
 }
 
-#[cfg_attr(feature = "openapi", derive(ToSchema, PartialSchema))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PriceTier {
     /// Duration in minutes for this price tier.
@@ -109,7 +109,7 @@ pub struct GcalConfig {
     pub time_slot_duration: Option<u16>, // In minutes
 }
 
-#[cfg_attr(feature = "openapi", derive(ToSchema))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AdhocSessionSettings {
     /// Can be set by an admin to quickly enable/disable the adhoc booking feature.

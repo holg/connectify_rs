@@ -510,6 +510,12 @@ pub mod mock {
         notification_service: Option<Arc<dyn NotificationService<Error = BoxedError>>>,
     }
 
+    impl Default for MockServiceFactory {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl MockServiceFactory {
         /// Create a new mock service factory.
         pub fn new() -> Self {

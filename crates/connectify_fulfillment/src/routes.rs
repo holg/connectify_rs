@@ -52,7 +52,7 @@ pub fn routes(
             && config
                 .adhoc_settings
                 .as_ref()
-                .map_or(false, |s| s.admin_enabled)
+                .is_some_and(|s| s.admin_enabled)
             && config.gcal.is_some()
         {
             info!("💡 Fulfillment: Adding /fulfill/adhoc-gcal-twilio route.");

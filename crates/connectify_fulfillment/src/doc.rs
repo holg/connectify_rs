@@ -1,7 +1,6 @@
 // --- File: crates/connectify_fulfillment/src/doc.rs ---
 
 // Only compile this module if the 'openapi' feature is enabled
-#![cfg(feature = "openapi")]
 // Allow dead code for the dummy functions used by utoipa macros
 #![allow(dead_code)]
 

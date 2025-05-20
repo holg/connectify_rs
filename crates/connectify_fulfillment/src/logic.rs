@@ -18,7 +18,6 @@ use tracing::{info, warn}; // To access GCal config
 /// * `BookSlotRequest` (aliased as `GcalBookSlotRequest`) - Request structure for booking calendar slots
 /// * `GcalError` - Error type for Google Calendar operations
 /// * `HubType` (aliased as `GcalHubType`) - The type representing the Google Calendar API client
-
 #[cfg(feature = "gcal")]
 use connectify_gcal::{
     auth::create_calendar_hub, // Function to create the GCal Hub

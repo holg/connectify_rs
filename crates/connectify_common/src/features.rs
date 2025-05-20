@@ -121,9 +121,5 @@ pub fn is_fulfillment_enabled(config: &Arc<AppConfig>) -> bool {
 
 #[cfg(feature = "adhoc")]
 pub fn is_adhoc_enabled(config: &Arc<AppConfig>) -> bool {
-    is_feature_enabled(
-        config,
-        config.use_adhoc_session,
-        config.use_adhoc_session.as_ref(),
-    )
+    is_feature_enabled(config, config.use_adhoc, config.adhoc_settings.as_ref())
 }

@@ -1,14 +1,8 @@
 // File: services/connectify_backend/src/main.rs
 use axum::{routing::get, Router};
-#[cfg(feature = "adhoc")]
-use connectify_adhoc;
 #[allow(unused_imports)]
 use connectify_common::{is_feature_enabled, logging};
 use connectify_config::load_config;
-#[cfg(feature = "gcal")]
-use connectify_gcal;
-#[cfg(feature = "twilio")]
-use connectify_twilio;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;

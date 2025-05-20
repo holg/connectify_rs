@@ -650,10 +650,18 @@ pub mod mock {
     use super::*;
     use std::collections::HashMap;
     use std::sync::Mutex;
+    // Type alias for the complex events storage structure
+    type EventStorage = HashMap<String, Vec<(String, CalendarEvent, String)>>;
 
     /// Mock calendar service for testing.
     pub struct MockCalendarService {
-        events: Mutex<HashMap<String, Vec<(String, CalendarEvent, String)>>>,
+        events: Mutex<EventStorage>,
+    }
+
+    impl Default for MockCalendarService {
+        fn default() -> Self {
+            Self::new()
+        }
     }
 
     impl MockCalendarService {
@@ -760,9 +768,7 @@ pub mod mock {
                 let event_id = format!("mock-event-{}", uuid::Uuid::new_v4());
 
                 let mut events = self.events.lock().unwrap();
-                let calendar_events = events
-                    .entry(calendar_id.to_string())
-                    .or_insert_with(Vec::new);
+                let calendar_events = events.entry(calendar_id.to_string()).or_default();
                 calendar_events.push((event_id.clone(), event, "confirmed".to_string()));
 
                 Ok(CalendarEventResult {

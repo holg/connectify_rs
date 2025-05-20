@@ -6,19 +6,20 @@ use std::sync::Arc;
 
 // Helper function to create a mock AppConfig for testing
 fn create_mock_config() -> Arc<AppConfig> {
-    let mut price_tiers = Vec::new();
-    price_tiers.push(PriceTier {
-        duration_minutes: 30,
-        unit_amount: 5000, // $50.00
-        currency: Some("USD".to_string()),
-        product_name: Some("30-minute consultation".to_string()),
-    });
-    price_tiers.push(PriceTier {
-        duration_minutes: 60,
-        unit_amount: 10000, // $100.00
-        currency: Some("USD".to_string()),
-        product_name: Some("60-minute consultation".to_string()),
-    });
+    let price_tiers = vec![
+        PriceTier {
+            duration_minutes: 30,
+            unit_amount: 5000, // $50.00
+            currency: Some("USD".to_string()),
+            product_name: Some("30-minute consultation".to_string()),
+        },
+        PriceTier {
+            duration_minutes: 60,
+            unit_amount: 10000, // $100.00
+            currency: Some("USD".to_string()),
+            product_name: Some("60-minute consultation".to_string()),
+        },
+    ];
 
     let stripe_config = StripeConfig {
         success_url: "https://example.com/success".to_string(),
@@ -97,10 +98,6 @@ async fn test_get_availability_endpoint() {
             assert!(body_str.contains("slots"));
         });
     });
-
-    // Just check that the test exists
-    // In a real test, you would check that the response contains the expected data
-    assert!(true, "Test exists");
 }
 
 #[tokio::test]
@@ -146,8 +143,4 @@ async fn test_book_slot_endpoint() {
             assert!(body_str.contains("event_id"));
         });
     });
-
-    // Just check that the test exists
-    // In a real test, you would check that the response contains the expected data
-    assert!(true, "Test exists");
 }
