@@ -44,40 +44,40 @@ impl IntoResponse for ConnectifyError {
     }
 }
 
-/// A utility function to convert a Result<T, ConnectifyError> to a Result<T, Response>.
+/// A utility function to convert a Result<T, ConnectifyError> to a Result<T, Box<Response>>.
 /// This is useful for Axum handlers that return a Result.
-pub fn handle_result<T>(result: Result<T, ConnectifyError>) -> Result<T, Response>
+pub fn handle_result<T>(result: Result<T, ConnectifyError>) -> Result<T, Box<Response>>
 where
     T: IntoResponse,
 {
-    result.map_err(|err| err.into_response())
+    result.map_err(|err| Box::new(err.into_response()))
 }
 
-/// A utility function to convert a Result<Json<T>, ConnectifyError> to a Result<Json<T>, Response>.
+/// A utility function to convert a Result<Json<T>, ConnectifyError> to a Result<Json<T>, Box<Response>>.
 /// This is useful for Axum handlers that return a JSON response.
-pub fn handle_json_result<T>(result: Result<T, ConnectifyError>) -> Result<Json<T>, Response>
+pub fn handle_json_result<T>(result: Result<T, ConnectifyError>) -> Result<Json<T>, Box<Response>>
 where
     T: serde::Serialize,
 {
-    result.map(Json).map_err(|err| err.into_response())
+    result.map(Json).map_err(|err| Box::new(err.into_response()))
 }
 
-/// A utility function to convert a Result<T, E> to a Result<T, Response> using a custom error mapper.
+/// A utility function to convert a Result<T, E> to a Result<T, Box<Response>> using a custom error mapper.
 /// This is useful for Axum handlers that need to convert domain-specific errors to HTTP responses.
-pub fn map_error<T, E, F>(result: Result<T, E>, f: F) -> Result<T, Response>
+pub fn map_error<T, E, F>(result: Result<T, E>, f: F) -> Result<T, Box<Response>>
 where
     T: IntoResponse,
     F: FnOnce(E) -> ConnectifyError,
 {
-    result.map_err(|err| f(err).into_response())
+    result.map_err(|err| Box::new(f(err).into_response()))
 }
 
-/// A utility function to convert a Result<T, E> to a Result<Json<T>, Response> using a custom error mapper.
+/// A utility function to convert a Result<T, E> to a Result<Json<T>, Box<Response>> using a custom error mapper.
 /// This is useful for Axum handlers that need to convert domain-specific errors to HTTP responses.
-pub fn map_json_error<T, E, F>(result: Result<T, E>, f: F) -> Result<Json<T>, Response>
+pub fn map_json_error<T, E, F>(result: Result<T, E>, f: F) -> Result<Json<T>, Box<Response>>
 where
     T: serde::Serialize,
     F: FnOnce(E) -> ConnectifyError,
 {
-    result.map(Json).map_err(|err| f(err).into_response())
+    result.map(Json).map_err(|err| Box::new(f(err).into_response()))
 }
