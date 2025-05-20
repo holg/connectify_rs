@@ -5,7 +5,8 @@ use std::{env, fs};
 use tracing::info;
 
 fn main() {
-    let out_dir = env::var("OUT_DIR").expect("Failed to get OUT_DIR environment variable");
+    let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| "./".to_string());
+
     info!("build.rs: starting config load");
 
     // Load the configuration with improved error handling
