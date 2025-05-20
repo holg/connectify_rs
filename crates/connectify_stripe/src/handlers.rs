@@ -51,9 +51,10 @@ pub struct StripeState {
     tag = "Stripe"
 ))]
 pub async fn create_checkout_session_handler(
-    State(state): State<Arc<StripeState>>,
+    State(state_arc): State<Arc<StripeState>>,
     Json(payload): Json<CreateCheckoutSessionRequest>,
 ) -> Result<Json<CreateCheckoutSessionResponse>, Response> {
+    let state = state_arc;
     if !state.config.use_stripe {
         return Err(
             ConnectifyError::ConfigError("Stripe service is disabled".to_string()).into_response(),
