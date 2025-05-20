@@ -9,7 +9,12 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::error::Error as StdError;
 use std::fmt;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
+
+/// Type alias for a boxed future that returns a Result
+pub type BoxFuture<'a, T, E> = Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'a>>;
 
 /// A wrapper error type that implements std::error::Error for Box<dyn std::error::Error + Send + Sync>
 #[derive(Debug)]
@@ -42,28 +47,20 @@ pub trait CalendarService: Send + Sync {
     type Error: std::error::Error + Send + Sync + 'static;
 
     /// Get busy time intervals within a specified time range.
+    #[allow(clippy::type_complexity)]
     fn get_busy_times(
         &self,
         calendar_id: &str,
         start_time: DateTime<Utc>,
         end_time: DateTime<Utc>,
-    ) -> std::pin::Pin<
-        Box<
-            dyn std::future::Future<
-                    Output = Result<Vec<(DateTime<Utc>, DateTime<Utc>)>, Self::Error>,
-                > + Send
-                + '_,
-        >,
-    >;
+    ) -> BoxFuture<'_, Vec<(DateTime<Utc>, DateTime<Utc>)>, Self::Error>;
 
     /// Create a calendar event.
     fn create_event(
         &self,
         calendar_id: &str,
         event: CalendarEvent,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<CalendarEventResult, Self::Error>> + Send + '_>,
-    >;
+    ) -> BoxFuture<'_, CalendarEventResult, Self::Error>;
 
     /// Delete a calendar event.
     fn delete_event(
@@ -71,7 +68,7 @@ pub trait CalendarService: Send + Sync {
         calendar_id: &str,
         event_id: &str,
         notify_attendees: bool,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Self::Error>> + Send + '_>>;
+    ) -> BoxFuture<'_, (), Self::Error>;
 
     /// Mark a calendar event as cancelled.
     fn mark_event_cancelled(
@@ -79,9 +76,7 @@ pub trait CalendarService: Send + Sync {
         calendar_id: &str,
         event_id: &str,
         notify_attendees: bool,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<CalendarEventResult, Self::Error>> + Send + '_>,
-    >;
+    ) -> BoxFuture<'_, CalendarEventResult, Self::Error>;
 
     /// Get booked events within a specified time range.
     fn get_booked_events(
@@ -90,9 +85,7 @@ pub trait CalendarService: Send + Sync {
         start_time: DateTime<Utc>,
         end_time: DateTime<Utc>,
         include_cancelled: bool,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<Vec<BookedEvent>, Self::Error>> + Send + '_>,
-    >;
+    ) -> BoxFuture<'_, Vec<BookedEvent>, Self::Error>;
 }
 
 /// A trait for payment service operations.
@@ -110,25 +103,19 @@ pub trait PaymentService: Send + Sync {
         currency: &str,
         description: Option<&str>,
         metadata: Option<serde_json::Value>,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<PaymentIntentResult, Self::Error>> + Send + '_>,
-    >;
+    ) -> BoxFuture<'_, PaymentIntentResult, Self::Error>;
 
     /// Confirm a payment intent.
     fn confirm_payment_intent(
         &self,
         payment_intent_id: &str,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<PaymentIntentResult, Self::Error>> + Send + '_>,
-    >;
+    ) -> BoxFuture<'_, PaymentIntentResult, Self::Error>;
 
     /// Cancel a payment intent.
     fn cancel_payment_intent(
         &self,
         payment_intent_id: &str,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<PaymentIntentResult, Self::Error>> + Send + '_>,
-    >;
+    ) -> BoxFuture<'_, PaymentIntentResult, Self::Error>;
 
     /// Create a refund.
     fn create_refund(
@@ -136,9 +123,7 @@ pub trait PaymentService: Send + Sync {
         payment_intent_id: &str,
         amount: Option<i64>,
         reason: Option<&str>,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<RefundResult, Self::Error>> + Send + '_>,
-    >;
+    ) -> BoxFuture<'_, RefundResult, Self::Error>;
 }
 
 /// A trait for notification service operations.
@@ -156,18 +141,14 @@ pub trait NotificationService: Send + Sync {
         subject: &str,
         body: &str,
         is_html: bool,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<NotificationResult, Self::Error>> + Send + '_>,
-    >;
+    ) -> BoxFuture<'_, NotificationResult, Self::Error>;
 
     /// Send an SMS notification.
     fn send_sms(
         &self,
         to: &str,
         body: &str,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<NotificationResult, Self::Error>> + Send + '_>,
-    >;
+    ) -> BoxFuture<'_, NotificationResult, Self::Error>;
 }
 
 /// A factory for creating service instances.
@@ -186,7 +167,6 @@ pub trait ServiceFactory: Send + Sync {
 }
 
 /// Data structures for calendar service operations.
-
 /// Represents a calendar event to be created.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CalendarEvent {
@@ -231,7 +211,6 @@ pub struct BookedEvent {
 }
 
 /// Data structures for payment service operations.
-
 /// Represents the result of a payment intent operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PaymentIntentResult {
@@ -261,7 +240,6 @@ pub struct RefundResult {
 }
 
 /// Data structures for notification service operations.
-
 /// Represents the result of a notification operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NotificationResult {

@@ -1,8 +1,10 @@
 // --- File: crates/connectify_fulfillment/src/handlers.rs ---
 
+#[cfg(feature = "gcal")]
 use axum::{extract::State, http::StatusCode, response::Json};
 use connectify_config::AppConfig;
 use std::sync::Arc;
+#[cfg(feature = "gcal")]
 use tracing::{info, warn}; // To access shared configuration
 
 // Import logic functions and request/response types
@@ -11,6 +13,7 @@ use crate::logic::{
     fulfill_adhoc_gcal_twilio_logic, fulfill_gcal_booking_logic, AdhocGcalTwilioFulfillmentRequest,
     GcalBookingFulfillmentRequest,
 };
+#[allow(unused_imports)]
 use crate::logic::{
     FulfillmentError,
     // GCal specific, conditionally imported

@@ -5,7 +5,6 @@ use config::ConfigError;
 pub use connectify_config_static::{
     apply_env_overrides_from_marker, ensure_dotenv_loaded, models::*, AppConfig,
 };
-use serde_json;
 use std::fmt;
 
 // Secret management module
@@ -62,7 +61,7 @@ impl From<serde_json::Error> for ConfigurationError {
     fn from(err: serde_json::Error) -> Self {
         ConfigurationError::ParseError(format!(
             "{} at line {}, column {}",
-            err.to_string(),
+            err,
             err.line(),
             err.column()
         ))
@@ -82,7 +81,7 @@ pub fn load_config() -> Result<AppConfig, ConfigurationError> {
         .map_err(|err| {
             ConfigurationError::ParseError(format!(
                 "Failed to parse embedded configuration: {} at line {}, column {}. This is likely a bug in the build script.",
-                err.to_string(), err.line(), err.column()
+                err, err.line(), err.column()
             ))
         })?;
 

@@ -135,7 +135,7 @@ fn get_encryption_key() -> Result<[u8; 32], SecretError> {
         .map_err(|_| SecretError::KeyError("Failed to generate encryption key".to_string()))?;
 
     // Save the key to a file
-    let key_b64 = general_purpose::STANDARD.encode(&key);
+    let key_b64 = general_purpose::STANDARD.encode(key);
     fs::write(&key_path, &key_b64)?;
 
     info!("Generated new encryption key and saved to {}", key_path);

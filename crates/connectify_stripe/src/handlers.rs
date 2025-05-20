@@ -117,7 +117,7 @@ pub async fn stripe_webhook_handler(
         .and_then(|h| h.to_str().ok());
 
     // Call the verification function from logic.rs
-    if let Err(e) = verify_stripe_signature(&body.as_bytes(), sig_header, &webhook_secret) {
+    if let Err(e) = verify_stripe_signature(body.as_bytes(), sig_header, &webhook_secret) {
         info!("Stripe webhook signature verification failed: {:?}", e);
         // Return 400 Bad Request for signature errors
         return ConnectifyError::from(e).into_response();

@@ -116,7 +116,6 @@ impl CalendarService for GoogleCalendarService {
                 time_zone: Some("UTC".to_string()),
                 items: Some(vec![FreeBusyRequestItem {
                     id: Some(calendar_id.to_string()),
-                    ..Default::default()
                 }]),
                 ..Default::default()
             };
@@ -565,8 +564,6 @@ impl CalendarService for GoogleCalendarService {
         Box<dyn std::future::Future<Output = Result<Vec<BookedEvent>, Self::Error>> + Send + '_>,
     > {
         let calendar_id = calendar_id.to_string();
-        let start_time = start_time;
-        let end_time = end_time;
         let calendar_hub = self.calendar_hub.clone();
 
         Box::pin(async move {

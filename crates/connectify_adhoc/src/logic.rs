@@ -106,6 +106,7 @@ pub async fn initiate_adhoc_session_logic(
     let stripe_config = app_config.stripe.as_ref().ok_or_else(|| {
         AdhocSessionError::ConfigError("Stripe configuration missing.".to_string())
     })?;
+    #[allow(unused_variables)]
     let calendar_id = gcal_config
         .calendar_id
         .as_ref()
@@ -173,7 +174,7 @@ pub async fn initiate_adhoc_session_logic(
         .price_tiers
         .iter()
         .find(|t| t.duration_minutes == request_data.duration_minutes)
-        .ok_or_else(|| AdhocSessionError::NoMatchingPriceTier(request_data.duration_minutes))?;
+        .ok_or(AdhocSessionError::NoMatchingPriceTier(request_data.duration_minutes))?;
 
     // 3. Generate unique room name
     let room_name = format!("adhoc-{}", Uuid::new_v4().simple());
@@ -185,7 +186,7 @@ pub async fn initiate_adhoc_session_logic(
             request_data.duration_minutes, room_name
         )
     });
-
+    #[allow(unused_variables)]
     let fulfillment_data = serde_json::json!({
         "start_time": effective_start_time.to_rfc3339(),
         "end_time": effective_end_time.to_rfc3339(),

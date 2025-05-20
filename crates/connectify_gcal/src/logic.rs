@@ -109,6 +109,7 @@ pub async fn get_busy_times(
 
 /// Calculates available slots based on busy times, working hours, etc.
 /// THIS IS A COMPLEX SKELETON - NEEDS DETAILED IMPLEMENTATION
+#[allow(clippy::too_many_arguments)]
 pub fn calculate_available_slots(
     query_start: DateTime<Utc>, // Start of the overall query range
     query_end: DateTime<Utc>,   // End of the overall query range
@@ -145,7 +146,7 @@ pub fn calculate_available_slots(
 
         // --- Check 1: Is potential_start_time within the overall query range? ---
         if potential_start_time < query_start || potential_end_time > query_end {
-            current_check_time = current_check_time + step; // Move to next step
+            current_check_time += step; // Move to next step
             continue;
         }
 
@@ -167,7 +168,7 @@ pub fn calculate_available_slots(
         {
             // Advance check time smartly (e.g., to start of next working day/hour)
             // For simplicity, just step forward for now
-            current_check_time = current_check_time + step;
+            current_check_time += step;
             continue;
         }
 

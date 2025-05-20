@@ -2,9 +2,12 @@
 
 use crate::auth::{fulfillment_auth_middleware, FulfillmentAuthState};
 use crate::handlers::FulfillmentState;
+
+#[allow(unused_imports)]
 use axum::{middleware, routing::post, Router};
 use connectify_config::AppConfig;
 use std::sync::Arc;
+#[allow(unused_imports)] // the warning is due to unused imports not recognized by rustfmt, but for features
 use tracing::info;
 
 // Conditionally import handlers based on features enabled for this crate
@@ -28,6 +31,7 @@ pub fn routes(
         config: config.clone(),
     });
 
+    #[allow(unused_mut)]
     let mut fulfillment_api_router = Router::new();
 
     // Conditionally add the GCal fulfillment routes

@@ -2,6 +2,7 @@
 use axum::{routing::get, Router};
 #[cfg(feature = "adhoc")]
 use connectify_adhoc;
+#[allow(unused_imports)]
 use connectify_common::{is_feature_enabled, logging};
 use connectify_config::load_config;
 #[cfg(feature = "gcal")]
@@ -11,7 +12,8 @@ use connectify_twilio;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
-use tracing::{info, warn};
+#[allow(unused_imports)]
+use tracing::{info, warn}; // we shall add more warns, even so now only some feature uses it right nwo
 // use axum::{extract::State, Json};
 
 // Import the AppState and AppStateBuilder from the app_state module
@@ -37,7 +39,7 @@ async fn main() {
     // This will initialize all services based on the configuration
     #[allow(unused_variables)]
     let app_state = AppState::new(config.clone()).await;
-
+    #[allow(unused_mut)]
     let mut api_router =
         Router::new().route("/", get(|| async { "Welcome to Connectify-Rs API!" }));
     // .route("/config", get(show_config))

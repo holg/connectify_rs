@@ -2,18 +2,19 @@
 //! Service factory implementation.
 //!
 //! This module provides an implementation of the ServiceFactory trait for the backend service.
-
-use chrono::{DateTime, Utc};
-use connectify_common::is_feature_enabled;
-use connectify_common::services::{
-    BookedEvent, BoxedError, CalendarEvent, CalendarEventResult, CalendarService,
-    NotificationResult, NotificationService, PaymentIntentResult, PaymentService, RefundResult,
-    ServiceFactory,
-};
 use connectify_config::AppConfig;
 use std::sync::Arc;
-#[allow(unused_imports)] // the warning is due to unused imports not recognozied by rustfmt
-use tracing::{error, info, warn};
+#[allow(unused_imports)] // even so it is used only by certain features, this shall change
+use {
+    chrono::{DateTime, Utc},
+    connectify_common::is_feature_enabled,
+    connectify_common::services::{
+        BookedEvent, BoxedError, CalendarEvent, CalendarEventResult, CalendarService,
+        NotificationResult, NotificationService, PaymentIntentResult, PaymentService, RefundResult,
+        ServiceFactory,
+    },
+    tracing::{error, info, warn},
+};
 
 #[cfg(feature = "gcal")]
 use connectify_gcal::{
@@ -63,6 +64,7 @@ pub struct ConnectifyServiceFactory {
 impl ConnectifyServiceFactory {
     /// Create a new service factory.
     pub async fn new(config: Arc<AppConfig>) -> Self {
+        #[allow(unused_mut)]
         let mut factory = Self {
             config: config.clone(),
             #[cfg(feature = "gcal")]

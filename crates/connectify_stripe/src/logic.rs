@@ -502,24 +502,23 @@ pub async fn create_checkout_session(
         )));
     }
     // --- End Price and Product Name Determination ---
-
-    let mut form_body: Vec<(String, String)> = Vec::new();
-    form_body.push(("payment_method_types[]".to_string(), "card".to_string()));
-    form_body.push(("mode".to_string(), "payment".to_string()));
-    form_body.push(("success_url".to_string(), stripe_config.success_url.clone()));
-    form_body.push(("cancel_url".to_string(), stripe_config.cancel_url.clone()));
-
-    form_body.push(("line_items[0][price_data][currency]".to_string(), currency));
-    form_body.push((
-        "line_items[0][price_data][product_data][name]".to_string(),
-        product_name,
-    ));
-    form_body.push((
-        "line_items[0][price_data][unit_amount]".to_string(),
-        unit_amount.to_string(),
-    ));
-    form_body.push(("line_items[0][quantity]".to_string(), "1".to_string()));
-
+    #[allow(clippy::vec_init_then_push)]
+    let mut form_body: Vec<(String, String)> = vec![
+        ("payment_method_types[]".to_string(), "card".to_string()),
+        ("mode".to_string(), "payment".to_string()),
+        ("success_url".to_string(), stripe_config.success_url.clone()),
+        ("cancel_url".to_string(), stripe_config.cancel_url.clone()),
+        ("line_items[0][price_data][currency]".to_string(), currency),
+        (
+            "line_items[0][price_data][product_data][name]".to_string(),
+            product_name,
+        ),
+        (
+            "line_items[0][price_data][unit_amount]".to_string(),
+            unit_amount.to_string(),
+        ),
+        ("line_items[0][quantity]".to_string(), "1".to_string()),
+    ];
     if let Some(client_ref_id) = &request_data.client_reference_id {
         form_body.push(("client_reference_id".to_string(), client_ref_id.clone()));
     }

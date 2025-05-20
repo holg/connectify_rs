@@ -3,6 +3,7 @@
 use connectify_config::GcalConfig;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+#[allow(unused_imports)]
 use tracing::{info, warn}; // To access GCal config
                            // use std::sync::Arc;
 

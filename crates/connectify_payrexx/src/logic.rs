@@ -293,11 +293,11 @@ pub async fn create_gateway_request(
     let currency = request_data
         .currency_override
         .as_deref()
-        .unwrap_or(&config.currency.as_deref().unwrap_or("CHF"));
+        .unwrap_or(config.currency.as_deref().unwrap_or("CHF"));
     let purpose = request_data
         .purpose_override
         .as_deref()
-        .unwrap_or(&config.product_name.as_deref().unwrap_or("Payment"));
+        .unwrap_or(config.product_name.as_deref().unwrap_or("Payment"));
     let reference_id = format!(
         "connectify-{}-{}",
         SERVICE_NAME,
