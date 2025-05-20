@@ -157,7 +157,7 @@ pub fn encrypt_string(plaintext: &str) -> Result<String, SecretError> {
     let tag_len = aead::AES_256_GCM.tag_len();
 
     // Reserve space for the authentication tag
-    in_out.extend(std::iter::repeat(0).take(tag_len));
+    in_out.extend(std::iter::repeat_n(0, tag_len));
 
     sealing_key
         .seal_in_place_append_tag(aead::Aad::empty(), &mut in_out)
