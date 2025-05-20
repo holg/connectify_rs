@@ -44,6 +44,8 @@ jobs:
           toolchain: stable
           override: true
           components: clippy
+      - name: Build workspace
+        run: cargo build --workspace --all-targets --all-features --release
       - name: Clippy check
         uses: actions-rs/clippy-check@v1
         with:
