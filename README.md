@@ -1,3 +1,10 @@
+## CI Status
+
+| Build & Test & Fmt & Clippy |
+|:---------------------------:|
+| [![Rust Tests](https://github.com/holg/connectify_rs/actions/workflows/rust-tests.yml/badge.svg?branch=main)](https://github.com/holg/connectify_rs/actions/workflows/rust-tests.yml) |
+[Test, Clippy, Rustfmt, Code coverage, Benchmark, clippy]
+
 # Connectify-RS: Modular API Service
 
 Connectify-RS is a modular backend service built in Rust using the Axum web framework. Designed as a Cargo workspace, it integrates various external services—Twilio for communication, Google Calendar for scheduling, Stripe and Payrexx for payments—and includes an internal fulfillment service to coordinate post-payment actions.

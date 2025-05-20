@@ -1,3 +1,10 @@
+## CI Status
+
+| Build & Test & Fmt & Clippy |
+|:---------------------------:|
+| [![Rust Tests](https://github.com/holg/connectify_rs/actions/workflows/rust-tests.yml/badge.svg?branch=main)](https://github.com/holg/connectify_rs/actions/workflows/rust-tests.yml) |
+[Test, Clippy, Rustfmt, Code coverage, Benchmark, clippy]
+
 # Connectify Fulfillment
 
 **connectify-fulfillment** orchestrates post-payment fulfillment tasks for Connectify services, such as booking Google Calendar events or sending Twilio notifications after successful payments.
