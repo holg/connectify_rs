@@ -1,4 +1,4 @@
-    // --- File: crates/connectify_common/src/http/client.rs ---
+// --- File: crates/connectify_common/src/http/client.rs ---
 use once_cell::sync::Lazy;
 use reqwest::{Client, Error as ReqwestError, Response};
 use std::time::Duration;

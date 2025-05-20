@@ -25,7 +25,7 @@ use connectify_common::{
 use connectify_config::AppConfig;
 use connectify_config::StripeConfig;
 use serde::Deserialize;
-use std::{sync::Arc};
+use std::sync::Arc;
 use tracing::info;
 #[cfg(feature = "openapi")]
 use utoipa::ToSchema;
@@ -65,8 +65,8 @@ pub async fn create_checkout_session_handler(
         map_json_error(
             create_checkout_session(stripe_config, payload).await,
             |err| err.into(), // Convert StripeError to ConnectifyError using the From implementation
-        ).map_err(|boxed| *boxed)
-
+        )
+        .map_err(|boxed| *boxed)
     } else {
         Err(config_error("Stripe configuration not loaded").into_response())
     }
@@ -261,8 +261,8 @@ pub async fn get_checkout_session_details_handler(
             info!("Error retrieving Stripe session details: {}", err);
             err.into() // Convert StripeError to ConnectifyError using the From implementation
         },
-    ).map_err(|boxed| *boxed)
-
+    )
+    .map_err(|boxed| *boxed)
 }
 #[axum::debug_handler]
 // Add OpenAPI docs if needed for admin routes
@@ -290,8 +290,8 @@ pub async fn admin_get_checkout_session_details_handler(
             info!("[ADMIN] Error retrieving Stripe session details: {}", err);
             err.into() // Convert StripeError to ConnectifyError using the From implementation
         },
-    ).map_err(|boxed| *boxed)
-
+    )
+    .map_err(|boxed| *boxed)
 }
 
 // --- NEW: Admin Handler to list Checkout Sessions ---
@@ -329,6 +329,7 @@ pub async fn admin_list_checkout_sessions_handler(
     map_json_error(list_checkout_sessions_admin(query_params).await, |err| {
         info!("[ADMIN] Error listing Stripe sessions: {}", err);
         err.into() // Convert StripeError to ConnectifyError using the From implementation
-    }).map_err(|boxed| *boxed)
-
+    })
+    .map_err(|boxed| *boxed)
 }
+/**/

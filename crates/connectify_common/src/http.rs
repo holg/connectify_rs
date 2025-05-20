@@ -59,7 +59,9 @@ pub fn handle_json_result<T>(result: Result<T, ConnectifyError>) -> Result<Json<
 where
     T: serde::Serialize,
 {
-    result.map(Json).map_err(|err| Box::new(err.into_response()))
+    result
+        .map(Json)
+        .map_err(|err| Box::new(err.into_response()))
 }
 
 /// A utility function to convert a Result<T, E> to a Result<T, Box<Response>> using a custom error mapper.
@@ -79,5 +81,7 @@ where
     T: serde::Serialize,
     F: FnOnce(E) -> ConnectifyError,
 {
-    result.map(Json).map_err(|err| Box::new(f(err).into_response()))
+    result
+        .map(Json)
+        .map_err(|err| Box::new(f(err).into_response()))
 }
