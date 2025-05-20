@@ -1,6 +1,5 @@
 // --- File: crates/connectify_stripe/src/handlers.rs ---
 // use crate::error::StripeError;
-use tracing::info;
 use crate::logic::{
     create_checkout_session, get_checkout_session_details, list_checkout_sessions_admin,
     process_stripe_webhook, verify_stripe_signature, CreateCheckoutSessionRequest,
@@ -27,6 +26,7 @@ use connectify_config::AppConfig;
 use connectify_config::StripeConfig;
 use serde::Deserialize;
 use std::sync::Arc;
+use tracing::info;
 #[cfg(feature = "openapi")]
 use utoipa::ToSchema;
 

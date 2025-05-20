@@ -1,28 +1,27 @@
 // --- File: crates/connectify_adhoc/src/logic.rs ---
 
-use tracing::info;
-use std::sync::Arc;
-use connectify_config::{AppConfig}; //, StripeConfig, GcalConfig, PriceTier, AdhocSessionSettings};
-use chrono::{Utc, Duration};
+use chrono::{Duration, Utc};
+use connectify_config::AppConfig; //, StripeConfig, GcalConfig, PriceTier, AdhocSessionSettings};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use thiserror::Error;
+use tracing::info;
 use uuid::Uuid; // For generating unique room names
 
 // We need to call GCal logic and Stripe logic
 #[cfg(feature = "gcal")]
-use connectify_gcal::logic::{get_busy_times as gcal_get_busy_times, GcalError};
+use connectify_gcal::auth::HubType as GcalHubType;
 #[cfg(feature = "gcal")]
-use connectify_gcal::auth::HubType as GcalHubType; // If passing an existing hub
+use connectify_gcal::logic::{get_busy_times as gcal_get_busy_times, GcalError}; // If passing an existing hub
 
+#[cfg(feature = "stripe")]
+use connectify_stripe::error::StripeError;
 #[cfg(feature = "stripe")]
 use connectify_stripe::logic::{
     create_checkout_session as stripe_create_checkout_session,
     CreateCheckoutSessionRequest as StripeCreateCheckoutRequest,
     // CreateCheckoutSessionResponse as StripeCreateCheckoutResponse
 };
-#[cfg(feature = "stripe")]
-use connectify_stripe::error::StripeError;
-
 
 #[derive(Error, Debug)]
 pub enum AdhocSessionError {
@@ -56,7 +55,6 @@ impl From<StripeError> for AdhocSessionError {
     }
 }
 
-
 #[derive(Deserialize, Debug)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct InitiateAdhocSessionRequest {
@@ -69,40 +67,49 @@ pub struct InitiateAdhocSessionRequest {
 #[derive(Serialize, Debug)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct InitiateAdhocSessionResponse {
-    #[cfg_attr(feature = "openapi", schema(example = "https://checkout.stripe.com/pay/cs_test_..."))]
+    #[cfg_attr(
+        feature = "openapi",
+        schema(example = "https://checkout.stripe.com/pay/cs_test_...")
+    )]
     pub stripe_checkout_url: String,
     #[cfg_attr(feature = "openapi", schema(example = "cs_test_..."))]
     pub stripe_session_id: String,
-    #[cfg_attr(feature = "openapi", schema(example = "adhoc-room-123e4567-e89b-12d3-a456-426614174000"))]
+    #[cfg_attr(
+        feature = "openapi",
+        schema(example = "adhoc-room-123e4567-e89b-12d3-a456-426614174000")
+    )]
     pub room_name: String,
     #[cfg_attr(feature = "openapi", schema(example = "2025-05-20T10:30:00Z"))]
     pub effective_start_time: String, // ISO 8601
     #[cfg_attr(feature = "openapi", schema(example = "2025-05-20T11:00:00Z"))]
-    pub effective_end_time: String,   // ISO 8601
+    pub effective_end_time: String, // ISO 8601
 }
 
 pub async fn initiate_adhoc_session_logic(
     app_config: Arc<AppConfig>,
     request_data: InitiateAdhocSessionRequest,
     // If GCalState is managed centrally and passed in:
-    #[cfg(feature = "gcal")]
-    gcal_hub: Option<Arc<GcalHubType>>, // Pass the initialized GCal Hub if available
+    #[cfg(feature = "gcal")] gcal_hub: Option<Arc<GcalHubType>>, // Pass the initialized GCal Hub if available
 ) -> Result<InitiateAdhocSessionResponse, AdhocSessionError> {
-
-    let adhoc_settings = app_config.adhoc_settings.as_ref()
-        .ok_or_else(|| AdhocSessionError::ConfigError("Adhoc session settings not configured.".to_string()))?;
+    let adhoc_settings = app_config.adhoc_settings.as_ref().ok_or_else(|| {
+        AdhocSessionError::ConfigError("Adhoc session settings not configured.".to_string())
+    })?;
 
     if !adhoc_settings.admin_enabled {
         return Err(AdhocSessionError::AdminDisabled);
     }
 
-    let gcal_config = app_config.gcal.as_ref()
+    let gcal_config = app_config
+        .gcal
+        .as_ref()
         .ok_or_else(|| AdhocSessionError::ConfigError("GCal configuration missing.".to_string()))?;
-    let stripe_config = app_config.stripe.as_ref()
-        .ok_or_else(|| AdhocSessionError::ConfigError("Stripe configuration missing.".to_string()))?;
-    let calendar_id = gcal_config.calendar_id.as_ref()
+    let stripe_config = app_config.stripe.as_ref().ok_or_else(|| {
+        AdhocSessionError::ConfigError("Stripe configuration missing.".to_string())
+    })?;
+    let calendar_id = gcal_config
+        .calendar_id
+        .as_ref()
         .ok_or_else(|| AdhocSessionError::ConfigError("GCal calendar_id missing.".to_string()))?;
-
 
     let now = Utc::now();
     let preparation_duration = Duration::minutes(adhoc_settings.preparation_time_minutes);
@@ -119,8 +126,16 @@ pub async fn initiate_adhoc_session_logic(
         let hub_to_use = match gcal_hub {
             Some(h_arc) => h_arc,
             None => {
-                hub_instance = Arc::new(connectify_gcal::auth::create_calendar_hub(gcal_config).await
-                    .map_err(|e| AdhocSessionError::GcalInteractionError(format!("Failed to create GCal client: {}", e)))?);
+                hub_instance = Arc::new(
+                    connectify_gcal::auth::create_calendar_hub(gcal_config)
+                        .await
+                        .map_err(|e| {
+                            AdhocSessionError::GcalInteractionError(format!(
+                                "Failed to create GCal client: {}",
+                                e
+                            ))
+                        })?,
+                );
                 hub_instance
             }
         };
@@ -130,7 +145,8 @@ pub async fn initiate_adhoc_session_logic(
             calendar_id,
             effective_start_time,
             effective_end_time,
-        ).await?;
+        )
+        .await?;
 
         if !busy_times.is_empty() {
             // Check if any busy period overlaps with the desired slot
@@ -140,7 +156,10 @@ pub async fn initiate_adhoc_session_logic(
                 }
             }
         }
-        info!("[Adhoc Logic] Slot from {} to {} is available.", effective_start_time, effective_end_time);
+        info!(
+            "[Adhoc Logic] Slot from {} to {} is available.",
+            effective_start_time, effective_end_time
+        );
     }
     #[cfg(not(feature = "gcal"))]
     {
@@ -149,9 +168,10 @@ pub async fn initiate_adhoc_session_logic(
         // For now, we'll proceed assuming it's available if GCal feature is off.
     }
 
-
     // 2. Find Price Tier
-    let price_tier = stripe_config.price_tiers.iter()
+    let price_tier = stripe_config
+        .price_tiers
+        .iter()
         .find(|t| t.duration_minutes == request_data.duration_minutes)
         .ok_or_else(|| AdhocSessionError::NoMatchingPriceTier(request_data.duration_minutes))?;
 
@@ -159,8 +179,12 @@ pub async fn initiate_adhoc_session_logic(
     let room_name = format!("adhoc-{}", Uuid::new_v4().simple());
 
     // 4. Prepare data for Stripe Checkout Session
-    let gcal_summary = price_tier.product_name.clone()
-        .unwrap_or_else(|| format!("Adhoc Session {} Min - {}", request_data.duration_minutes, room_name));
+    let gcal_summary = price_tier.product_name.clone().unwrap_or_else(|| {
+        format!(
+            "Adhoc Session {} Min - {}",
+            request_data.duration_minutes, room_name
+        )
+    });
 
     let fulfillment_data = serde_json::json!({
         "start_time": effective_start_time.to_rfc3339(),
@@ -186,14 +210,15 @@ pub async fn initiate_adhoc_session_logic(
     let mut dynamic_stripe_config = stripe_config.clone(); // Clone to modify success_url
     dynamic_stripe_config.success_url = format!(
         "{}?room_name={}&session_id={{CHECKOUT_SESSION_ID}}", // Assuming base success_url doesn't have query params
-        stripe_config.success_url.trim_end_matches('/'), // Ensure no double slash
+        stripe_config.success_url.trim_end_matches('/'),      // Ensure no double slash
         room_name
     );
     // If your base success_url already has query params, append with &
     // Example: "https://.../success.html?someparam=value&room_name=...&session_id=..."
 
     #[cfg(feature = "stripe")]
-    let stripe_session_response = stripe_create_checkout_session(&dynamic_stripe_config, stripe_request).await?;
+    let stripe_session_response =
+        stripe_create_checkout_session(&dynamic_stripe_config, stripe_request).await?;
 
     #[cfg(feature = "stripe")]
     {
@@ -207,6 +232,8 @@ pub async fn initiate_adhoc_session_logic(
     }
     #[cfg(not(feature = "stripe"))]
     {
-        Err(AdhocSessionError::ConfigError("Stripe feature not enabled.".to_string()))
+        Err(AdhocSessionError::ConfigError(
+            "Stripe feature not enabled.".to_string(),
+        ))
     }
 }

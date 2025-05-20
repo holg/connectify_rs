@@ -1,15 +1,14 @@
 // src/calendly/config.rs
 #![cfg(feature = "calendly")]
 
-use std::env;
-use oauth2::{
-    AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl, EndpointSet,
-    EndpointNotSet, StandardErrorResponse,StandardTokenResponse,
-    EmptyExtraTokenFields, StandardTokenIntrospectionResponse,
-    StandardRevocableToken, RevocationErrorResponseType,
-    basic::{BasicErrorResponseType, BasicClient, BasicTokenType}
-};
 use cookie::Key as CookieSignKey;
+use oauth2::{
+    basic::{BasicClient, BasicErrorResponseType, BasicTokenType},
+    AuthUrl, ClientId, ClientSecret, EmptyExtraTokenFields, EndpointNotSet, EndpointSet,
+    RedirectUrl, RevocationErrorResponseType, StandardErrorResponse, StandardRevocableToken,
+    StandardTokenIntrospectionResponse, StandardTokenResponse, TokenUrl,
+};
+use std::env;
 #[derive(Clone)]
 pub struct CalendlyConfig {
     pub client_id: ClientId,
@@ -33,9 +32,12 @@ impl CalendlyConfig {
             .map_err(|_| "Missing CALENDLY_CLIENT_SECRET".to_string())?;
         let redirect_uri = env::var("CALENDLY_REDIRECT_URI")
             .map_err(|_| "Missing CALENDLY_REDIRECT_URI".to_string())
-            .and_then(|u| RedirectUrl::new(u).map_err(|_| "Invalid CALENDLY_REDIRECT_URI".to_string()))?;
+            .and_then(|u| {
+                RedirectUrl::new(u).map_err(|_| "Invalid CALENDLY_REDIRECT_URI".to_string())
+            })?;
 
-        let csrf_key_raw = env::var("CSRF_STATE_SECRET").map_err(|_| "Missing CSRF_STATE_SECRET".to_string())?;
+        let csrf_key_raw =
+            env::var("CSRF_STATE_SECRET").map_err(|_| "Missing CSRF_STATE_SECRET".to_string())?;
         if csrf_key_raw.len() < 32 {
             return Err("CSRF_STATE_SECRET must be at least 32 bytes.".into());
         }
@@ -46,14 +48,16 @@ impl CalendlyConfig {
         let token_url = TokenUrl::new("https://auth.calendly.com/oauth/token".to_string())
             .map_err(|_| "Invalid Token URL".to_string())?;
 
-        let database_url = env::var("DATABASE_URL")
-            .map_err(|_| "Missing DATABASE_URL".to_string())?;
-        let encryption_key_hex = env::var("ENCRYPTION_KEY")
-            .map_err(|_| "Missing ENCRYPTION_KEY".to_string())?;
+        let database_url =
+            env::var("DATABASE_URL").map_err(|_| "Missing DATABASE_URL".to_string())?;
+        let encryption_key_hex =
+            env::var("ENCRYPTION_KEY").map_err(|_| "Missing ENCRYPTION_KEY".to_string())?;
         let encryption_key = hex::decode(encryption_key_hex)
             .map_err(|_| "ENCRYPTION_KEY must be hex-encoded".to_string())?;
 
-        let personal_token = env::var("CALENDLY_PERSONAL_TOKEN").ok().map(|s| s.into_bytes());
+        let personal_token = env::var("CALENDLY_PERSONAL_TOKEN")
+            .ok()
+            .map(|s| s.into_bytes());
 
         Ok(Self {
             client_id,
@@ -68,7 +72,9 @@ impl CalendlyConfig {
         })
     }
 
-    pub fn oauth_client(&self) -> BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet> {
+    pub fn oauth_client(
+        &self,
+    ) -> BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet> {
         BasicClient::new(self.client_id.clone())
             .set_client_secret(self.client_secret.clone())
             .set_auth_uri(self.auth_url.clone())
@@ -77,18 +83,15 @@ impl CalendlyConfig {
     }
 }
 
+use crate::calendly::{calendly_slots::SlotEventUrlCache, CalendlySlotsState};
 use crate::storage::{TokenStore, TokenStoreData};
-use crate::calendly::{CalendlySlotsState, calendly_slots::SlotEventUrlCache};
 use crate::utils::sqlx_helper::create_sqlite_token_store;
 use std::sync::Arc;
 
 pub async fn create_token_store(config: &CalendlyConfig) -> TokenStore {
-    create_sqlite_token_store(
-        &config.database_url,
-        config.encryption_key,
-    )
-    .await
-    .expect("Failed to create token store")
+    create_sqlite_token_store(&config.database_url, config.encryption_key)
+        .await
+        .expect("Failed to create token store")
 }
 
 pub fn create_slots_state(config: &CalendlyConfig) -> CalendlySlotsState {

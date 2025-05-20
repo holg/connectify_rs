@@ -2,19 +2,20 @@
 #![cfg(feature = "calendly")]
 
 use actix_web::{
-    get, post, web, HttpRequest, HttpResponse, Responder, Result as ActixResult, error, http::header
+    error, get, http::header, post, web, HttpRequest, HttpResponse, Responder,
+    Result as ActixResult,
 };
-use std::sync::Arc;
-use oauth2::{CsrfToken, Scope, TokenResponse};
 use cookie::{Cookie, CookieJar};
+use oauth2::{CsrfToken, Scope, TokenResponse};
+use std::sync::Arc;
 
-use crate::models::{
-    CalendlyConfig, CalendlySlotsState, AuthCallbackQuery, SlotsQuery, BookSlotRequest
-};
 use crate::logic::{
-    exchange_code_for_token, extract_csrf_state, extract_csrf_state_fallback,
-    calculate_date_range, fetch_calendly_user_url, fetch_event_types,
-    fetch_availability_for_event, get_default_user_token, CSRF_COOKIE_NAME
+    calculate_date_range, exchange_code_for_token, extract_csrf_state, extract_csrf_state_fallback,
+    fetch_availability_for_event, fetch_calendly_user_url, fetch_event_types,
+    get_default_user_token, CSRF_COOKIE_NAME,
+};
+use crate::models::{
+    AuthCallbackQuery, BookSlotRequest, CalendlyConfig, CalendlySlotsState, SlotsQuery,
 };
 use crate::storage::TokenStore;
 use crate::utils::crypto;
@@ -24,24 +25,32 @@ use crate::utils::crypto;
 #[get("/auth/calendly/start")]
 pub async fn start_calendly_auth(config: web::Data<CalendlyConfig>) -> ActixResult<impl Responder> {
     let Some(csrf_key) = config.csrf_state_key.clone().into() else {
-        return Err(error::ErrorInternalServerError("Missing CSRF key in config"));
+        return Err(error::ErrorInternalServerError(
+            "Missing CSRF key in config",
+        ));
     };
     let client = config.oauth_client() else {
-        return Err(error::ErrorInternalServerError("Calendly OAuth client init failed"));
+        return Err(error::ErrorInternalServerError(
+            "Calendly OAuth client init failed",
+        ));
     };
 
-    let (authorize_url, csrf_token) = client.authorize_url(CsrfToken::new_random)
-        .add_scope(Scope::new("default".to_string())).url();
+    let (authorize_url, csrf_token) = client
+        .authorize_url(CsrfToken::new_random)
+        .add_scope(Scope::new("default".to_string()))
+        .url();
     let state_value = csrf_token.secret().to_string();
     let encoded_state = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(state_value);
     let mut jar = CookieJar::new();
 
     jar.private_mut(&csrf_key).add(
         Cookie::build(CSRF_COOKIE_NAME, encoded_state.clone())
-            .path("/").secure(false).http_only(true)
+            .path("/")
+            .secure(false)
+            .http_only(true)
             .same_site(cookie::SameSite::Lax)
             .max_age(cookie::time::Duration::minutes(10))
-            .finish()
+            .finish(),
     );
 
     let mut response_builder = HttpResponse::Found();
@@ -78,27 +87,34 @@ pub async fn calendly_auth_callback(
     let service_name = "calendly";
     let token_response = exchange_code_for_token(&query.code, &config).await?;
     let access_token = token_response.access_token();
-    let encrypted_access_token = crypto::encrypt(&config.encryption_key.to_vec(), access_token.secret().as_bytes())
-        .map_err(|_| error::ErrorInternalServerError("Encryption failed"))?;
+    let encrypted_access_token = crypto::encrypt(
+        &config.encryption_key.to_vec(),
+        access_token.secret().as_bytes(),
+    )
+    .map_err(|_| error::ErrorInternalServerError("Encryption failed"))?;
     let refresh_token_opt = token_response.refresh_token();
     let expires_in_opt = token_response.expires_in();
 
-    let encrypted_refresh_token = refresh_token_opt.map(|rt| {
-        crypto::encrypt(&config.encryption_key.to_vec(), rt.secret().as_bytes())
-    }).transpose().expect("expected refresh token to be present"); // converts Result<Option<Vec<u8>>> into Option<Result<Vec<u8>>> -> Result<Option<Vec<u8>>>
+    let encrypted_refresh_token = refresh_token_opt
+        .map(|rt| crypto::encrypt(&config.encryption_key.to_vec(), rt.secret().as_bytes()))
+        .transpose()
+        .expect("expected refresh token to be present"); // converts Result<Option<Vec<u8>>> into Option<Result<Vec<u8>>> -> Result<Option<Vec<u8>>>
 
     let expires_at = expires_in_opt
         .and_then(|std_dur| chrono::Duration::from_std(std_dur).ok())
         .map(|chrono_dur| chrono::Utc::now() + chrono_dur)
         .map(|dt| dt.timestamp());
 
-    token_store.save_token(
-        user_identifier,
-        service_name,
-        &encrypted_access_token,
-        encrypted_refresh_token.as_deref(),
-        expires_at,
-    ).await.map_err(|_| error::ErrorInternalServerError("Failed to save token"))?;
+    token_store
+        .save_token(
+            user_identifier,
+            service_name,
+            &encrypted_access_token,
+            encrypted_refresh_token.as_deref(),
+            expires_at,
+        )
+        .await
+        .map_err(|_| error::ErrorInternalServerError("Failed to save token"))?;
 
     Ok(HttpResponse::Ok().body("Calendly access token stored successfully"))
 }
@@ -121,14 +137,9 @@ pub async fn get_available_slots(
     }
     let mut all_slots = Vec::new();
     for event in event_types {
-        let mut event_slots = fetch_availability_for_event(
-            &state.client,
-            &token,
-            &event,
-            &start_date,
-            &end_date,
-        )
-            .await;
+        let mut event_slots =
+            fetch_availability_for_event(&state.client, &token, &event, &start_date, &end_date)
+                .await;
         all_slots.append(&mut event_slots);
     }
 
@@ -143,13 +154,18 @@ pub async fn book_slot(
 ) -> ActixResult<impl Responder> {
     let token = get_default_user_token(&config).await?;
 
-    let invitee_email = payload.invitee_email.clone().unwrap_or_else(|| "somebody@swissappgroup.ch".to_string());
-    let event_type = payload.event_type.clone().ok_or_else(|| {
-        actix_web::error::ErrorBadRequest("Missing event_type in request")
-    })?;
-    let start_time = payload.start_time.clone().ok_or_else(|| {
-        actix_web::error::ErrorBadRequest("Missing start_time in request")
-    })?;
+    let invitee_email = payload
+        .invitee_email
+        .clone()
+        .unwrap_or_else(|| "somebody@swissappgroup.ch".to_string());
+    let event_type = payload
+        .event_type
+        .clone()
+        .ok_or_else(|| actix_web::error::ErrorBadRequest("Missing event_type in request"))?;
+    let start_time = payload
+        .start_time
+        .clone()
+        .ok_or_else(|| actix_web::error::ErrorBadRequest("Missing start_time in request"))?;
 
     let body = serde_json::json!({
         "event_type": event_type,
@@ -175,16 +191,16 @@ pub async fn book_slot(
             if status.is_success() {
                 Ok(HttpResponse::Ok().body(body))
             } else {
-                Ok(HttpResponse::BadRequest()
-                    .body(format!("Calendly API error: {}", body)))
+                Ok(HttpResponse::BadRequest().body(format!("Calendly API error: {}", body)))
             }
         }
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .body(format!("Request failed: {e}"))),
+        Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Request failed: {e}"))),
     }
 }
 
 #[get("/calendly_test.html")]
 pub async fn calendly_test_file() -> actix_web::Result<actix_files::NamedFile> {
-    Ok(actix_files::NamedFile::open("tests/e2e/calendly_test.html")?)
+    Ok(actix_files::NamedFile::open(
+        "tests/e2e/calendly_test.html",
+    )?)
 }

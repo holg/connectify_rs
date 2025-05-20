@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use connectify_common::services::{NotificationResult, NotificationService};
+use connectify_config::AppConfig;
 use std::future::Future;
 use std::pin::Pin;
-use connectify_common::services::{NotificationService, NotificationResult};
-use connectify_config::AppConfig;
+use std::sync::Arc;
 use thiserror::Error;
 
 /// Twilio-specific error types.
@@ -69,9 +69,12 @@ impl NotificationService for TwilioNotificationService {
         Box::pin(async move {
             // This would need to be implemented with Twilio API
             // For now, return a placeholder
-            Err(TwilioError::ApiError { 
-                status_code: 501, 
-                message: format!("Not implemented: send_email to {} with subject {}", to, subject) 
+            Err(TwilioError::ApiError {
+                status_code: 501,
+                message: format!(
+                    "Not implemented: send_email to {} with subject {}",
+                    to, subject
+                ),
             })
         })
     }
@@ -88,9 +91,9 @@ impl NotificationService for TwilioNotificationService {
         Box::pin(async move {
             // This would need to be implemented with Twilio API
             // For now, return a placeholder
-            Err(TwilioError::ApiError { 
-                status_code: 501, 
-                message: format!("Not implemented: send_sms to {} with body {}", to, body) 
+            Err(TwilioError::ApiError {
+                status_code: 501,
+                message: format!("Not implemented: send_sms to {} with body {}", to, body),
             })
         })
     }

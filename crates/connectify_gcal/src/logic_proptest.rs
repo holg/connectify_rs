@@ -5,7 +5,10 @@ mod tests {
     use proptest::prelude::*;
 
     // Helper function to create a valid time range
-    fn create_time_range(start_offset_hours: i64, duration_days: i64) -> (DateTime<Utc>, DateTime<Utc>) {
+    fn create_time_range(
+        start_offset_hours: i64,
+        duration_days: i64,
+    ) -> (DateTime<Utc>, DateTime<Utc>) {
         let start = Utc::now() + Duration::hours(start_offset_hours);
         let end = start + Duration::days(duration_days);
         (start, end)
@@ -57,7 +60,7 @@ mod tests {
 
             // Define working days (all days for simplicity)
             let working_days = [
-                Weekday::Mon, Weekday::Tue, Weekday::Wed, 
+                Weekday::Mon, Weekday::Tue, Weekday::Wed,
                 Weekday::Thu, Weekday::Fri, Weekday::Sat, Weekday::Sun
             ];
 
@@ -80,13 +83,13 @@ mod tests {
                 let slot_end_time = (*slot + appointment_duration).time();
 
                 // The slot should start after or at work_start
-                prop_assert!(slot_time >= work_start, 
-                    "Slot should start after work hours begin: {:?}, work start: {:?}", 
+                prop_assert!(slot_time >= work_start,
+                    "Slot should start after work hours begin: {:?}, work start: {:?}",
                     slot_time, work_start);
 
                 // The slot should end before or at work_end
-                prop_assert!(slot_end_time <= work_end, 
-                    "Slot should end before work hours end: {:?}, work end: {:?}", 
+                prop_assert!(slot_end_time <= work_end,
+                    "Slot should end before work hours end: {:?}, work end: {:?}",
                     slot_end_time, work_end);
             }
         }
@@ -115,7 +118,7 @@ mod tests {
 
             // Define working days (all days for simplicity)
             let working_days = [
-                Weekday::Mon, Weekday::Tue, Weekday::Wed, 
+                Weekday::Mon, Weekday::Tue, Weekday::Wed,
                 Weekday::Thu, Weekday::Fri, Weekday::Sat, Weekday::Sun
             ];
 
@@ -140,8 +143,8 @@ mod tests {
                     // Check for overlap: (StartA < EndB) and (EndA > StartB)
                     let overlaps = slot < busy_end && slot_end > *busy_start;
 
-                    prop_assert!(!overlaps, 
-                        "Slot {:?} to {:?} overlaps with busy period {:?} to {:?}", 
+                    prop_assert!(!overlaps,
+                        "Slot {:?} to {:?} overlaps with busy period {:?} to {:?}",
                         slot, slot_end, busy_start, busy_end);
                 }
             }
@@ -171,7 +174,7 @@ mod tests {
 
             // Define working days (all days for simplicity)
             let working_days = [
-                Weekday::Mon, Weekday::Tue, Weekday::Wed, 
+                Weekday::Mon, Weekday::Tue, Weekday::Wed,
                 Weekday::Thu, Weekday::Fri, Weekday::Sat, Weekday::Sun
             ];
 
@@ -193,8 +196,8 @@ mod tests {
                 let time_diff = slots[i] - slots[i-1];
 
                 // The difference should be at least the appointment duration plus buffer
-                prop_assert!(time_diff >= appointment_duration + buffer, 
-                    "Slots should be at least duration + buffer apart: {:?} and {:?}, diff: {:?}, expected: {:?}", 
+                prop_assert!(time_diff >= appointment_duration + buffer,
+                    "Slots should be at least duration + buffer apart: {:?} and {:?}, diff: {:?}, expected: {:?}",
                     slots[i-1], slots[i], time_diff, appointment_duration + buffer);
             }
         }

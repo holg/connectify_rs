@@ -1,6 +1,5 @@
 // File: crates/connectify_gcal/src/handlers.rs
 // use google_calendar3::api::Event;
-use tracing::info;
 use crate::logic::{
     calculate_available_slots, create_calendar_event, delete_calendar_event, get_booked_events,
     mark_event_cancelled, AvailabilityQuery, AvailableSlotsResponse, BookSlotRequest,
@@ -15,6 +14,7 @@ use axum::{
 use chrono::{Duration, NaiveDate, NaiveTime, TimeZone, Utc};
 use connectify_config::{AppConfig, PriceTier}; // Use the unified config
 use std::sync::Arc;
+use tracing::info;
 
 use crate::auth::HubType; // Import the Hub type alias
 
@@ -42,19 +42,27 @@ pub async fn get_availability_handler(
     State(state): State<Arc<GcalState>>,
     Query(query): Query<AvailabilityQuery>,
 ) -> Result<Json<AvailableSlotsResponse>, (StatusCode, String)> {
-
     // Ensure GCal feature is enabled via runtime config
     if !state.config.use_gcal {
-        return Err((StatusCode::SERVICE_UNAVAILABLE, "GCal service is disabled.".to_string()));
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "GCal service is disabled.".to_string(),
+        ));
     }
 
     let gcal_config = state.config.gcal.as_ref().ok_or_else(|| {
         info!("GCal configuration missing in AppConfig.");
-        (StatusCode::INTERNAL_SERVER_ERROR, "Server configuration error: GCal config missing.".to_string())
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Server configuration error: GCal config missing.".to_string(),
+        )
     })?;
     let calendar_id = gcal_config.calendar_id.as_ref().ok_or_else(|| {
         info!("GCal calendar_id missing in GcalConfig.");
-        (StatusCode::INTERNAL_SERVER_ERROR, "Server configuration error: GCal calendar ID missing.".to_string())
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Server configuration error: GCal calendar ID missing.".to_string(),
+        )
     })?;
 
     // --- Find Price Tier ---
@@ -62,30 +70,55 @@ pub async fn get_availability_handler(
     // This could be moved to a more generic "ServicePricingConfig" if needed.
     let stripe_config = state.config.stripe.as_ref().ok_or_else(|| {
         info!("Stripe configuration (for price tiers) missing in AppConfig.");
-        (StatusCode::INTERNAL_SERVER_ERROR, "Pricing configuration error on server.".to_string())
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Pricing configuration error on server.".to_string(),
+        )
     })?;
 
-    let price_tier: &PriceTier = stripe_config.price_tiers.iter()
+    let price_tier: &PriceTier = stripe_config
+        .price_tiers
+        .iter()
         .find(|tier| tier.duration_minutes == query.duration_minutes)
         .ok_or_else(|| {
-            let err_msg = format!("No service offered for {} minute duration.", query.duration_minutes);
+            let err_msg = format!(
+                "No service offered for {} minute duration.",
+                query.duration_minutes
+            );
             info!("{}", err_msg);
             (StatusCode::BAD_REQUEST, err_msg)
         })?;
 
     // --- Parse Dates & Validate ---
-    let start_naive_date = NaiveDate::parse_from_str(&query.start_date, "%Y-%m-%d")
-        .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid start_date format (YYYY-MM-DD)".to_string()))?;
-    let end_naive_date = NaiveDate::parse_from_str(&query.end_date, "%Y-%m-%d")
-        .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid end_date format (YYYY-MM-DD)".to_string()))?;
+    let start_naive_date =
+        NaiveDate::parse_from_str(&query.start_date, "%Y-%m-%d").map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                "Invalid start_date format (YYYY-MM-DD)".to_string(),
+            )
+        })?;
+    let end_naive_date = NaiveDate::parse_from_str(&query.end_date, "%Y-%m-%d").map_err(|_| {
+        (
+            StatusCode::BAD_REQUEST,
+            "Invalid end_date format (YYYY-MM-DD)".to_string(),
+        )
+    })?;
 
     if end_naive_date < start_naive_date {
-        return Err((StatusCode::BAD_REQUEST, "end_date must be after start_date".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "end_date must be after start_date".to_string(),
+        ));
     }
     // Add 1 day to end_date to include the full end day in the range
-    let end_naive_date_inclusive = end_naive_date.checked_add_days(chrono::Days::new(1)).ok_or_else(|| {
-        (StatusCode::INTERNAL_SERVER_ERROR, "Date calculation overflow".to_string())
-    })?;
+    let end_naive_date_inclusive = end_naive_date
+        .checked_add_days(chrono::Days::new(1))
+        .ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Date calculation overflow".to_string(),
+            )
+        })?;
 
     let start_naive_datetime = start_naive_date.and_hms_opt(0, 0, 0).unwrap(); // start of day
     let end_naive_datetime = end_naive_date_inclusive.and_hms_opt(0, 0, 0).unwrap(); // start of next day
@@ -95,7 +128,10 @@ pub async fn get_availability_handler(
 
     let appointment_duration_chrono = Duration::minutes(query.duration_minutes);
     if appointment_duration_chrono <= Duration::zero() {
-        return Err((StatusCode::BAD_REQUEST, "duration_minutes must be positive".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "duration_minutes must be positive".to_string(),
+        ));
     }
 
     // --- Fetch Busy Times ---
@@ -103,12 +139,17 @@ pub async fn get_availability_handler(
         &state.calendar_hub,
         calendar_id,
         query_start_utc,
-        query_end_utc
-    ).await {
+        query_end_utc,
+    )
+    .await
+    {
         Ok(periods) => periods,
         Err(e) => {
             info!("Error fetching GCal free/busy: {}", e);
-            return Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to query calendar availability".to_string()));
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to query calendar availability".to_string(),
+            ));
         }
     };
 
@@ -116,17 +157,31 @@ pub async fn get_availability_handler(
     // TODO: Make working hours, days, buffer, step configurable via AppConfig
     let work_start = NaiveTime::from_hms_opt(9, 0, 0).unwrap();
     let work_end = NaiveTime::from_hms_opt(17, 0, 0).unwrap();
-    let working_days = [chrono::Weekday::Mon, chrono::Weekday::Tue, chrono::Weekday::Wed, chrono::Weekday::Thu, chrono::Weekday::Fri];
+    let working_days = [
+        chrono::Weekday::Mon,
+        chrono::Weekday::Tue,
+        chrono::Weekday::Wed,
+        chrono::Weekday::Thu,
+        chrono::Weekday::Fri,
+    ];
     let buffer = Duration::minutes(0);
     let step = Duration::minutes(15); // Slot checking interval
 
     let available_datetime_slots = calculate_available_slots(
-        query_start_utc, query_end_utc, &busy_periods, appointment_duration_chrono,
-        work_start, work_end, &working_days, buffer, step
+        query_start_utc,
+        query_end_utc,
+        &busy_periods,
+        appointment_duration_chrono,
+        work_start,
+        work_end,
+        &working_days,
+        buffer,
+        step,
     );
 
     // --- Transform to PricedSlots ---
-    let priced_slots: Vec<PricedSlot> = available_datetime_slots.iter()
+    let priced_slots: Vec<PricedSlot> = available_datetime_slots
+        .iter()
         .map(|slot_start_utc| {
             let slot_end_utc = *slot_start_utc + appointment_duration_chrono;
             PricedSlot {
@@ -134,15 +189,22 @@ pub async fn get_availability_handler(
                 end_time: slot_end_utc.to_rfc3339(),
                 duration_minutes: query.duration_minutes, // This is the requested duration
                 price: price_tier.unit_amount,
-                currency: price_tier.currency.clone().unwrap_or_else(||
-                                                                         stripe_config.default_currency.clone().unwrap_or_else(|| "USD".to_string()) // Fallback currency
+                currency: price_tier.currency.clone().unwrap_or_else(
+                    || {
+                        stripe_config
+                            .default_currency
+                            .clone()
+                            .unwrap_or_else(|| "USD".to_string())
+                    }, // Fallback currency
                 ),
                 product_name: price_tier.product_name.clone(),
             }
         })
         .collect();
 
-    Ok(Json(AvailableSlotsResponse { slots: priced_slots }))
+    Ok(Json(AvailableSlotsResponse {
+        slots: priced_slots,
+    }))
 }
 
 /// Handler to book a time slot.

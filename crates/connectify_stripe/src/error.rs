@@ -1,9 +1,5 @@
 // --- File: crates/connectify_stripe/src/error.rs ---
-use connectify_common::{
-    ConnectifyError, 
-    external_service_error, 
-    HttpStatusCode
-};
+use connectify_common::{external_service_error, ConnectifyError, HttpStatusCode};
 use thiserror::Error;
 
 /// Stripe-specific error types.
@@ -62,21 +58,49 @@ pub enum StripeError {
 impl From<StripeError> for ConnectifyError {
     fn from(err: StripeError) -> Self {
         match err {
-            StripeError::RequestError(e) => ConnectifyError::HttpError(format!("Stripe request error: {}", e)),
-            StripeError::ApiError { status_code, message } => external_service_error(
-                "Stripe API", 
-                format!("Status: {}, Message: {}", status_code, message)
+            StripeError::RequestError(e) => {
+                ConnectifyError::HttpError(format!("Stripe request error: {}", e))
+            }
+            StripeError::ApiError {
+                status_code,
+                message,
+            } => external_service_error(
+                "Stripe API",
+                format!("Status: {}, Message: {}", status_code, message),
             ),
-            StripeError::ParseError(e) => ConnectifyError::ParseError(format!("Stripe response parse error: {}", e)),
-            StripeError::ConfigError => ConnectifyError::ConfigError("Stripe configuration missing or incomplete".to_string()),
-            StripeError::WebhookSignatureError(msg) => ConnectifyError::AuthError(format!("Stripe webhook signature error: {}", msg)),
-            StripeError::WebhookProcessingError(msg) => external_service_error("Stripe webhook", msg),
-            StripeError::FulfillmentError(msg) => external_service_error("Fulfillment service", msg),
-            StripeError::MissingFulfillmentData => ConnectifyError::ValidationError("Missing fulfillment data in webhook metadata".to_string()),
-            StripeError::SessionNotFoundOrNotPaid => ConnectifyError::NotFoundError("Stripe session not found or not paid".to_string()),
-            StripeError::InvalidFulfillmentDataForPricing(msg) => ConnectifyError::ValidationError(format!("Invalid fulfillment data for pricing: {}", msg)),
-            StripeError::NoMatchingPriceTier(duration) => ConnectifyError::ValidationError(format!("No matching price tier found for duration: {} minutes", duration)),
-            StripeError::InternalError(msg) => ConnectifyError::InternalError(format!("Stripe internal error: {}", msg)),
+            StripeError::ParseError(e) => {
+                ConnectifyError::ParseError(format!("Stripe response parse error: {}", e))
+            }
+            StripeError::ConfigError => ConnectifyError::ConfigError(
+                "Stripe configuration missing or incomplete".to_string(),
+            ),
+            StripeError::WebhookSignatureError(msg) => {
+                ConnectifyError::AuthError(format!("Stripe webhook signature error: {}", msg))
+            }
+            StripeError::WebhookProcessingError(msg) => {
+                external_service_error("Stripe webhook", msg)
+            }
+            StripeError::FulfillmentError(msg) => {
+                external_service_error("Fulfillment service", msg)
+            }
+            StripeError::MissingFulfillmentData => ConnectifyError::ValidationError(
+                "Missing fulfillment data in webhook metadata".to_string(),
+            ),
+            StripeError::SessionNotFoundOrNotPaid => {
+                ConnectifyError::NotFoundError("Stripe session not found or not paid".to_string())
+            }
+            StripeError::InvalidFulfillmentDataForPricing(msg) => ConnectifyError::ValidationError(
+                format!("Invalid fulfillment data for pricing: {}", msg),
+            ),
+            StripeError::NoMatchingPriceTier(duration) => {
+                ConnectifyError::ValidationError(format!(
+                    "No matching price tier found for duration: {} minutes",
+                    duration
+                ))
+            }
+            StripeError::InternalError(msg) => {
+                ConnectifyError::InternalError(format!("Stripe internal error: {}", msg))
+            }
         }
     }
 }

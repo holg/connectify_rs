@@ -3,7 +3,7 @@ use std::fmt;
 use thiserror::Error;
 
 /// The base error type for all Connectify errors.
-/// 
+///
 /// This enum provides a common set of error variants that can be used across all crates.
 /// Each crate can extend this by implementing From<SpecificError> for ConnectifyError.
 #[derive(Error, Debug)]
@@ -65,7 +65,7 @@ pub enum ConnectifyError {
 }
 
 /// A trait for converting errors to HTTP status codes.
-/// 
+///
 /// This trait can be implemented by error types to provide a consistent way
 /// to convert errors to HTTP status codes.
 pub trait HttpStatusCode {
@@ -94,7 +94,7 @@ impl HttpStatusCode for ConnectifyError {
 }
 
 /// A trait for adding context to errors.
-/// 
+///
 /// This trait can be implemented by error types to provide a consistent way
 /// to add context to errors.
 pub trait Context<T, E> {
@@ -115,9 +115,7 @@ impl<T, E: std::error::Error + Send + Sync + 'static> Context<T, E> for Result<T
     where
         C: fmt::Display + Send + Sync + 'static,
     {
-        self.map_err(|error| {
-            ConnectifyError::InternalError(format!("{}: {}", context, error))
-        })
+        self.map_err(|error| ConnectifyError::InternalError(format!("{}: {}", context, error)))
     }
 
     fn with_context<C, F>(self, f: F) -> Result<T, ConnectifyError>
@@ -125,9 +123,7 @@ impl<T, E: std::error::Error + Send + Sync + 'static> Context<T, E> for Result<T
         C: fmt::Display + Send + Sync + 'static,
         F: FnOnce() -> C,
     {
-        self.map_err(|error| {
-            ConnectifyError::InternalError(format!("{}: {}", f(), error))
-        })
+        self.map_err(|error| ConnectifyError::InternalError(format!("{}: {}", f(), error)))
     }
 }
 

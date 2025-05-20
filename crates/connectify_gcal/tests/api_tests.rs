@@ -3,7 +3,7 @@ use axum::{
     http::{Request, StatusCode},
     Router,
 };
-use connectify_config::{AppConfig, GcalConfig, StripeConfig, PriceTier};
+use connectify_config::{AppConfig, GcalConfig, PriceTier, StripeConfig};
 use connectify_gcal::routes::routes;
 use std::sync::Arc;
 // tower import removed as it's not available in the test environment
@@ -127,12 +127,14 @@ async fn test_book_slot_endpoint() {
                 .uri("/book")
                 .method("POST")
                 .header("Content-Type", "application/json")
-                .body(Body::from(r#"{
+                .body(Body::from(
+                    r#"{
                     "start_time": "2025-01-01T10:00:00Z",
                     "end_time": "2025-01-01T11:00:00Z",
                     "summary": "Test Booking",
                     "description": "Test Description"
-                }"#))
+                }"#,
+                ))
                 .unwrap();
 
             // Note: In a real test with proper imports, we would use:

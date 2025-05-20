@@ -1,12 +1,9 @@
 // --- File: crates/connectify_calendly/src/models.rs ---
 #![cfg(feature = "calendly")]
 
-use serde::{Deserialize, Serialize};
-use oauth2::{
-    AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl, EndpointSet,
-    EndpointNotSet,
-};
 use cookie::Key as CookieSignKey;
+use oauth2::{AuthUrl, ClientId, ClientSecret, EndpointNotSet, EndpointSet, RedirectUrl, TokenUrl};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 
 // --- Request/Response Types ---

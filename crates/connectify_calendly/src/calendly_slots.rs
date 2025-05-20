@@ -1,11 +1,11 @@
 #![cfg(feature = "calendly")]
 #![allow(dead_code)]
+use crate::calendly::{refresh_calendly_token, CalendlySlotsState};
 use crate::config::AppConfig;
-use crate::calendly::{CalendlySlotsState,refresh_calendly_token};
-use actix_web::{get, post, web, HttpResponse, Responder, Result as ActixResult};
-use chrono::{Duration, Utc, NaiveDate};
-use serde::{Deserialize, Serialize};
 use crate::storage::{create_sqlite_token_store, TokenStore};
+use actix_web::{get, post, web, HttpResponse, Responder, Result as ActixResult};
+use chrono::{Duration, NaiveDate, Utc};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 
 pub type SlotEventUrlCache = Arc<RwLock<Vec<String>>>;
@@ -54,7 +54,6 @@ struct AvailabilityResponse {
     _available_times: Vec<SlotInterval>,
 }
 
-
 #[derive(Deserialize)]
 struct TimeSlot {
     start_time: String,
@@ -84,14 +83,9 @@ pub async fn get_available_slots(
     }
     let mut all_slots = Vec::new();
     for event in event_types {
-        let mut event_slots = fetch_availability_for_event(
-            &state.client,
-            &token,
-            &event,
-            &start_date,
-            &end_date,
-        )
-            .await;
+        let mut event_slots =
+            fetch_availability_for_event(&state.client, &token, &event, &start_date, &end_date)
+                .await;
         all_slots.append(&mut event_slots);
     }
 
@@ -106,13 +100,18 @@ pub async fn book_slot(
 ) -> ActixResult<impl Responder> {
     let token = get_default_user_token(&config).await?;
 
-    let invitee_email = payload.invitee_email.clone().unwrap_or_else(|| "somebody@swissappgroup.ch".to_string());
-    let event_type = payload.event_type.clone().ok_or_else(|| {
-        actix_web::error::ErrorBadRequest("Missing event_type in request")
-    })?;
-    let start_time = payload.start_time.clone().ok_or_else(|| {
-        actix_web::error::ErrorBadRequest("Missing start_time in request")
-    })?;
+    let invitee_email = payload
+        .invitee_email
+        .clone()
+        .unwrap_or_else(|| "somebody@swissappgroup.ch".to_string());
+    let event_type = payload
+        .event_type
+        .clone()
+        .ok_or_else(|| actix_web::error::ErrorBadRequest("Missing event_type in request"))?;
+    let start_time = payload
+        .start_time
+        .clone()
+        .ok_or_else(|| actix_web::error::ErrorBadRequest("Missing start_time in request"))?;
 
     let body = serde_json::json!({
         "event_type": event_type,
@@ -138,12 +137,10 @@ pub async fn book_slot(
             if status.is_success() {
                 Ok(HttpResponse::Ok().body(body))
             } else {
-                Ok(HttpResponse::BadRequest()
-                    .body(format!("Calendly API error: {}", body)))
+                Ok(HttpResponse::BadRequest().body(format!("Calendly API error: {}", body)))
             }
         }
-        Err(e) => Ok(HttpResponse::InternalServerError()
-            .body(format!("Request failed: {e}"))),
+        Err(e) => Ok(HttpResponse::InternalServerError().body(format!("Request failed: {e}"))),
     }
 }
 
@@ -151,11 +148,15 @@ pub async fn book_slot(
 
 fn calculate_date_range(query: &web::Query<SlotsQuery>) -> (String, String) {
     let today = Utc::now().date_naive();
-    let start = query.start_date.clone()
+    let start = query
+        .start_date
+        .clone()
         .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
         .unwrap_or_else(|| today + Duration::days(1));
 
-    let end = query.end_date.clone()
+    let end = query
+        .end_date
+        .clone()
         .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
         .unwrap_or_else(|| start + Duration::days(6)); // keep range ≤ 7 days
 
@@ -191,15 +192,17 @@ async fn fetch_calendly_user_url(
         .bearer_auth(token)
         .send()
         .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to fetch user: {e}")))?;
+        .map_err(|e| {
+            actix_web::error::ErrorInternalServerError(format!("Failed to fetch user: {e}"))
+        })?;
 
-    let body = user_resp
-        .text()
-        .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to read response: {e}")))?;
+    let body = user_resp.text().await.map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Failed to read response: {e}"))
+    })?;
     info!("📦 Raw Calendly /me response:\n{}", body);
-    let me: MeResponse = serde_json::from_str(&body)
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to parse user: {e}")))?;
+    let me: MeResponse = serde_json::from_str(&body).map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Failed to parse user: {e}"))
+    })?;
     info!("User URI: {}", me.resource.uri);
     {
         let mut write_guard = state.calendly_user_url.write().unwrap();
@@ -218,25 +221,30 @@ async fn fetch_event_types(
         // 1. Prüfen, ob gecachte URIs vorhanden sind
         let cached = state.calendly_event_urls.read().unwrap();
         if !cached.is_empty() {
-            let events = cached.iter().map(|uri| EventType {
-                uri: uri.clone(),
-                name: "<cached>".to_string(), // Wir speichern Namen nicht im Cache
-            }).collect();
+            let events = cached
+                .iter()
+                .map(|uri| EventType {
+                    uri: uri.clone(),
+                    name: "<cached>".to_string(), // Wir speichern Namen nicht im Cache
+                })
+                .collect();
             return Ok(events);
         }
     }
     // 2. Sonst API Call machen
     let url = format!("https://api.calendly.com/event_types?user={}", user_uri);
-    let res = state.client
+    let res = state
+        .client
         .get(&url)
         .bearer_auth(token)
         .send()
         .await
         .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed request: {e}")))?;
 
-    let body = res.text().await.map_err(|e| {
-        actix_web::error::ErrorInternalServerError(format!("Body read error: {e}"))
-    })?;
+    let body = res
+        .text()
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Body read error: {e}")))?;
 
     let parsed: EventTypesResponse = serde_json::from_str(&body).map_err(|e| {
         actix_web::error::ErrorInternalServerError(format!("JSON parse error: {e}"))
@@ -274,7 +282,10 @@ async fn fetch_availability_for_event(
 
     let mut slots = Vec::new();
     let resp = client.get(&url).bearer_auth(token).send().await;
-    info!("�� Raw Calendly /event_type_available_times response:\n{:?}", resp);
+    info!(
+        "�� Raw Calendly /event_type_available_times response:\n{:?}",
+        resp
+    );
     if let Ok(resp) = resp {
         if resp.status().is_success() {
             if let Ok(parsed) = resp.json::<AvailableTimesResponse>().await {
@@ -307,24 +318,25 @@ async fn fetch_availability_for_event(
     slots
 }
 
-pub async fn get_default_user_token(
-    config: &AppConfig,
-) -> Result<String, actix_web::Error> {
+pub async fn get_default_user_token(config: &AppConfig) -> Result<String, actix_web::Error> {
     let token_store = create_sqlite_token_store(
         &config.calendly_config.database_url,
-        config.calendly_config.encryption_key.to_vec()
-    ).await.unwrap();
+        config.calendly_config.encryption_key.to_vec(),
+    )
+    .await
+    .unwrap();
 
-    let (access_token, refresh_token_opt, expires_at_opt) =
-        token_store.get_token_decrypted("default_calendly_user", "calendly").await
-            .map_err(|e| {
-                info!("❌ Failed to load token: {e}");
-                actix_web::error::ErrorInternalServerError("DB error")
-            })?
-            .ok_or_else(|| {
-                info!("❌ Token not found for default_calendly_user");
-                actix_web::error::ErrorUnauthorized("Calendly token missing")
-            })?;
+    let (access_token, refresh_token_opt, expires_at_opt) = token_store
+        .get_token_decrypted("default_calendly_user", "calendly")
+        .await
+        .map_err(|e| {
+            info!("❌ Failed to load token: {e}");
+            actix_web::error::ErrorInternalServerError("DB error")
+        })?
+        .ok_or_else(|| {
+            info!("❌ Token not found for default_calendly_user");
+            actix_web::error::ErrorUnauthorized("Calendly token missing")
+        })?;
 
     let now = chrono::Utc::now().timestamp();
     let is_expired = expires_at_opt.map(|exp| exp <= now).unwrap_or(true);
@@ -338,8 +350,10 @@ pub async fn get_default_user_token(
                 actix_web::error::ErrorInternalServerError("Missing refresh_token")
             })?,
         )
-            .await
-            .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Token refresh failed: {e}")))?;
+        .await
+        .map_err(|e| {
+            actix_web::error::ErrorInternalServerError(format!("Token refresh failed: {e}"))
+        })?;
 
         let new_access = new_token.access_token.clone();
         let new_refresh = new_token.refresh_token.clone();
@@ -365,7 +379,9 @@ pub async fn get_default_user_token(
 }
 
 fn get_personal_access_token(config: &AppConfig) -> Option<String> {
-    config.calendly_config.personal_token.as_ref().and_then(|bytes| {
-        String::from_utf8(bytes.clone()).ok()
-    })
+    config
+        .calendly_config
+        .personal_token
+        .as_ref()
+        .and_then(|bytes| String::from_utf8(bytes.clone()).ok())
 }

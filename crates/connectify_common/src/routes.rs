@@ -6,12 +6,12 @@
 // - Common API endpoints
 // - Shared route configuration
 
-use axum::{Router, routing::get};
+use axum::{routing::get, Router};
 
 // Currently empty as no common routes have been defined yet.
 
 /// Creates a router containing common routes that can be used across the application.
-/// 
+///
 /// # Returns
 /// A router configured with common routes.
 pub fn routes() -> Router {

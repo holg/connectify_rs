@@ -3,14 +3,14 @@
 //!
 //! This module provides an implementation of the CalendarService trait for Google Calendar.
 
-use tracing::info;
-use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use connectify_common::services::{
     BookedEvent, CalendarEvent, CalendarEventResult, CalendarService,
 };
 use google_calendar3::api::{Event, EventDateTime, FreeBusyRequest, FreeBusyRequestItem};
+use std::sync::Arc;
 use thiserror::Error;
+use tracing::info;
 
 use crate::auth::HubType;
 
@@ -75,7 +75,7 @@ impl CalendarService for GoogleCalendarService {
     /// ```ignore
     /// use chrono::{Utc, Duration};
     /// use std::sync::Arc;
-    /// 
+    ///
     /// async fn example() -> Result<(), Box<dyn std::error::Error>> {
     ///     // Create a GoogleCalendarService instance
     ///     // let calendar_service = GoogleCalendarService::new(...);
@@ -98,7 +98,14 @@ impl CalendarService for GoogleCalendarService {
         calendar_id: &str,
         start_time: DateTime<Utc>,
         end_time: DateTime<Utc>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<(DateTime<Utc>, DateTime<Utc>)>, Self::Error>> + Send + '_>> {
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<
+                    Output = Result<Vec<(DateTime<Utc>, DateTime<Utc>)>, Self::Error>,
+                > + Send
+                + '_,
+        >,
+    > {
         let calendar_id = calendar_id.to_string();
         let calendar_hub = self.calendar_hub.clone();
 
@@ -172,7 +179,7 @@ impl CalendarService for GoogleCalendarService {
     /// ```ignore
     /// use std::sync::Arc;
     /// use connectify_common::services::CalendarEvent;
-    /// 
+    ///
     /// async fn example() -> Result<(), Box<dyn std::error::Error>> {
     ///     // Create a GoogleCalendarService instance
     ///     // let calendar_service = GoogleCalendarService::new(...);
@@ -194,7 +201,9 @@ impl CalendarService for GoogleCalendarService {
         &self,
         calendar_id: &str,
         event: CalendarEvent,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<CalendarEventResult, Self::Error>> + Send + '_>> {
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<CalendarEventResult, Self::Error>> + Send + '_>,
+    > {
         let calendar_id = calendar_id.to_string();
         let event = event.clone();
         let calendar_hub = self.calendar_hub.clone();
@@ -203,7 +212,9 @@ impl CalendarService for GoogleCalendarService {
         Box::pin(async move {
             // Parse start and end times from request strings
             let start_dt = DateTime::parse_from_rfc3339(&event.start_time)
-                .map_err(|e| GcalServiceError::TimeParseError(format!("Invalid start_time: {}", e)))?
+                .map_err(|e| {
+                    GcalServiceError::TimeParseError(format!("Invalid start_time: {}", e))
+                })?
                 .with_timezone(&Utc);
             let end_dt = DateTime::parse_from_rfc3339(&event.end_time)
                 .map_err(|e| GcalServiceError::TimeParseError(format!("Invalid end_time: {}", e)))?
@@ -253,7 +264,9 @@ impl CalendarService for GoogleCalendarService {
 
             Ok(CalendarEventResult {
                 event_id: created_event.id,
-                status: created_event.status.unwrap_or_else(|| "confirmed".to_string()),
+                status: created_event
+                    .status
+                    .unwrap_or_else(|| "confirmed".to_string()),
             })
         })
     }
@@ -306,14 +319,19 @@ impl CalendarService for GoogleCalendarService {
         calendar_id: &str,
         event_id: &str,
         notify_attendees: bool,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Self::Error>> + Send + '_>> {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Self::Error>> + Send + '_>>
+    {
         let calendar_id = calendar_id.to_string();
         let event_id = event_id.to_string();
         let calendar_hub = self.calendar_hub.clone();
 
         Box::pin(async move {
             // First check if the event exists and get its status
-            let get_result = calendar_hub.events().get(&calendar_id, &event_id).doit().await;
+            let get_result = calendar_hub
+                .events()
+                .get(&calendar_id, &event_id)
+                .doit()
+                .await;
 
             // If the event doesn't exist, consider it "successfully deleted"
             if let Err(e) = get_result {
@@ -437,13 +455,19 @@ impl CalendarService for GoogleCalendarService {
         calendar_id: &str,
         event_id: &str,
         notify_attendees: bool,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<CalendarEventResult, Self::Error>> + Send + '_>> {
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<CalendarEventResult, Self::Error>> + Send + '_>,
+    > {
         let calendar_id = calendar_id.to_string();
         let event_id = event_id.to_string();
         let calendar_hub = self.calendar_hub.clone();
 
         Box::pin(async move {
-            let (_response, event) = calendar_hub.events().get(&calendar_id, &event_id).doit().await?;
+            let (_response, event) = calendar_hub
+                .events()
+                .get(&calendar_id, &event_id)
+                .doit()
+                .await?;
 
             // Create a minimal event with sequence number + 1
             let sequence = event.sequence.map(|n| n + 1).unwrap_or(1);
@@ -502,7 +526,7 @@ impl CalendarService for GoogleCalendarService {
     ///
     /// ```ignore
     /// use chrono::{Utc, Duration};
-    /// 
+    ///
     /// async fn example() -> Result<(), Box<dyn std::error::Error>> {
     ///     // Create a GoogleCalendarService instance
     ///     // let calendar_service = GoogleCalendarService::new(...);
@@ -537,7 +561,9 @@ impl CalendarService for GoogleCalendarService {
         start_time: DateTime<Utc>,
         end_time: DateTime<Utc>,
         include_cancelled: bool,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<BookedEvent>, Self::Error>> + Send + '_>> {
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Vec<BookedEvent>, Self::Error>> + Send + '_>,
+    > {
         let calendar_id = calendar_id.to_string();
         let start_time = start_time;
         let end_time = end_time;
@@ -650,7 +676,14 @@ pub mod mock {
             calendar_id: &str,
             start_time: DateTime<Utc>,
             end_time: DateTime<Utc>,
-        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<(DateTime<Utc>, DateTime<Utc>)>, Self::Error>> + Send + '_>> {
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<
+                        Output = Result<Vec<(DateTime<Utc>, DateTime<Utc>)>, Self::Error>,
+                    > + Send
+                    + '_,
+            >,
+        > {
             let calendar_id = calendar_id.to_string();
 
             Box::pin(async move {
@@ -684,16 +717,24 @@ pub mod mock {
             &self,
             calendar_id: &str,
             event: CalendarEvent,
-        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<CalendarEventResult, Self::Error>> + Send + '_>> {
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<Output = Result<CalendarEventResult, Self::Error>>
+                    + Send
+                    + '_,
+            >,
+        > {
             let calendar_id = calendar_id.to_string();
             let event = event.clone();
 
             Box::pin(async move {
                 // Parse and validate times
-                let start_dt = DateTime::parse_from_rfc3339(&event.start_time)
-                    .map_err(|e| GcalServiceError::TimeParseError(format!("Invalid start_time: {}", e)))?;
-                let end_dt = DateTime::parse_from_rfc3339(&event.end_time)
-                    .map_err(|e| GcalServiceError::TimeParseError(format!("Invalid end_time: {}", e)))?;
+                let start_dt = DateTime::parse_from_rfc3339(&event.start_time).map_err(|e| {
+                    GcalServiceError::TimeParseError(format!("Invalid start_time: {}", e))
+                })?;
+                let end_dt = DateTime::parse_from_rfc3339(&event.end_time).map_err(|e| {
+                    GcalServiceError::TimeParseError(format!("Invalid end_time: {}", e))
+                })?;
 
                 if end_dt <= start_dt {
                     return Err(GcalServiceError::CalculationError(
@@ -702,14 +743,18 @@ pub mod mock {
                 }
 
                 // Check for conflicts
-                let busy_times = self.get_busy_times(
-                    &calendar_id,
-                    start_dt.with_timezone(&Utc),
-                    end_dt.with_timezone(&Utc),
-                ).await?;
+                let busy_times = self
+                    .get_busy_times(
+                        &calendar_id,
+                        start_dt.with_timezone(&Utc),
+                        end_dt.with_timezone(&Utc),
+                    )
+                    .await?;
 
                 for (busy_start, busy_end) in &busy_times {
-                    if start_dt.with_timezone(&Utc) < *busy_end && end_dt.with_timezone(&Utc) > *busy_start {
+                    if start_dt.with_timezone(&Utc) < *busy_end
+                        && end_dt.with_timezone(&Utc) > *busy_start
+                    {
                         return Err(GcalServiceError::Conflict);
                     }
                 }
@@ -718,7 +763,9 @@ pub mod mock {
                 let event_id = format!("mock-event-{}", uuid::Uuid::new_v4());
 
                 let mut events = self.events.lock().unwrap();
-                let calendar_events = events.entry(calendar_id.to_string()).or_insert_with(Vec::new);
+                let calendar_events = events
+                    .entry(calendar_id.to_string())
+                    .or_insert_with(Vec::new);
                 calendar_events.push((event_id.clone(), event, "confirmed".to_string()));
 
                 Ok(CalendarEventResult {
@@ -733,7 +780,8 @@ pub mod mock {
             calendar_id: &str,
             event_id: &str,
             _notify_attendees: bool,
-        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Self::Error>> + Send + '_>> {
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Self::Error>> + Send + '_>>
+        {
             let calendar_id = calendar_id.to_string();
             let event_id = event_id.to_string();
 
@@ -753,7 +801,13 @@ pub mod mock {
             calendar_id: &str,
             event_id: &str,
             _notify_attendees: bool,
-        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<CalendarEventResult, Self::Error>> + Send + '_>> {
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<Output = Result<CalendarEventResult, Self::Error>>
+                    + Send
+                    + '_,
+            >,
+        > {
             let calendar_id = calendar_id.to_string();
             let event_id = event_id.to_string();
 
@@ -772,7 +826,10 @@ pub mod mock {
                     }
                 }
 
-                Err(GcalServiceError::CalculationError(format!("Event not found: {}", event_id)))
+                Err(GcalServiceError::CalculationError(format!(
+                    "Event not found: {}",
+                    event_id
+                )))
             })
         }
 
@@ -782,7 +839,11 @@ pub mod mock {
             start_time: DateTime<Utc>,
             end_time: DateTime<Utc>,
             include_cancelled: bool,
-        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<BookedEvent>, Self::Error>> + Send + '_>> {
+        ) -> std::pin::Pin<
+            Box<
+                dyn std::future::Future<Output = Result<Vec<BookedEvent>, Self::Error>> + Send + '_,
+            >,
+        > {
             let calendar_id = calendar_id.to_string();
 
             Box::pin(async move {

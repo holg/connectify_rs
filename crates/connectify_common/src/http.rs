@@ -19,8 +19,8 @@ pub trait IntoHttpResponse {
 
 impl IntoHttpResponse for ConnectifyError {
     fn into_http_response(self) -> Response {
-        let status_code = StatusCode::from_u16(self.status_code())
-            .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+        let status_code =
+            StatusCode::from_u16(self.status_code()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
 
         let error_message = self.to_string();
 

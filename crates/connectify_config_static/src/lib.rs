@@ -1,12 +1,12 @@
 use config::{Config, ConfigError, Environment, File};
 use once_cell::sync::OnceCell;
+use serde_json::Value;
 use std::env;
 use std::path::PathBuf;
-use serde_json::{Value};
 pub mod models;
 // use dotenv;
 pub use models::*;
-use tracing::{info};
+use tracing::info;
 
 pub fn load_config() -> Result<AppConfig, ConfigError> {
     ensure_dotenv_loaded();

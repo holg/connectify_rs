@@ -8,7 +8,9 @@
 use utoipa::OpenApi;
 // Import request/response schemas from the logic module
 // These structs will need to derive utoipa::ToSchema in logic.rs
-use crate::logic::{GcalBookingFulfillmentRequest, AdhocGcalTwilioFulfillmentRequest, FulfillmentResponse};
+use crate::logic::{
+    AdhocGcalTwilioFulfillmentRequest, FulfillmentResponse, GcalBookingFulfillmentRequest,
+};
 
 // --- Dummy function for GCal Booking Fulfillment Endpoint ---
 #[utoipa::path(

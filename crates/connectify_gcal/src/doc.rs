@@ -3,8 +3,8 @@
 #![allow(dead_code)]
 #![cfg(feature = "openapi")]
 use crate::logic::BookedEventsResponse;
-use utoipa::OpenApi;
 use utoipa;
+use utoipa::OpenApi;
 
 use crate::logic::{
     AvailabilityQuery, AvailableSlotsResponse, BookSlotRequest, BookedEvent, BookedEventsQuery,

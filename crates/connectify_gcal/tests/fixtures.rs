@@ -4,8 +4,8 @@
 //! to create test data for Google Calendar tests.
 
 use chrono::{DateTime, Duration, NaiveTime, Utc, Weekday};
-use connectify_config::{AppConfig, GcalConfig, StripeConfig, PriceTier};
 use connectify_common::services::CalendarEvent;
+use connectify_config::{AppConfig, GcalConfig, PriceTier, StripeConfig};
 use std::sync::Arc;
 
 /// Creates a test calendar event with the given parameters
@@ -116,13 +116,22 @@ pub fn create_mock_config() -> Arc<AppConfig> {
 pub fn create_working_hours_config() -> (NaiveTime, NaiveTime, [Weekday; 5]) {
     let work_start = NaiveTime::from_hms_opt(9, 0, 0).unwrap();
     let work_end = NaiveTime::from_hms_opt(17, 0, 0).unwrap();
-    let working_days = [Weekday::Mon, Weekday::Tue, Weekday::Wed, Weekday::Thu, Weekday::Fri];
+    let working_days = [
+        Weekday::Mon,
+        Weekday::Tue,
+        Weekday::Wed,
+        Weekday::Thu,
+        Weekday::Fri,
+    ];
 
     (work_start, work_end, working_days)
 }
 
 /// Creates a date range for testing
-pub fn create_date_range(start_offset_days: i64, duration_days: i64) -> (DateTime<Utc>, DateTime<Utc>) {
+pub fn create_date_range(
+    start_offset_days: i64,
+    duration_days: i64,
+) -> (DateTime<Utc>, DateTime<Utc>) {
     let start = Utc::now() + Duration::days(start_offset_days);
     let end = start + Duration::days(duration_days);
     (start, end)

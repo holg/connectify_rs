@@ -1,25 +1,28 @@
+use connectify_config::secrets;
+use serde_json::Value;
 use std::env;
 use std::fs;
 use std::path::Path;
-use serde_json::Value;
-use connectify_config::secrets;
-use tracing::{info};
+use tracing::info;
 fn main() {
     let args: Vec<String> = env::args().collect();
-    
+
     if args.len() < 3 {
         info!("Usage: migrate_config <source_file> <target_file>");
         info!("Migrates configuration from source file to target file format.");
         info!("Example: migrate_config config/old_config.yml config/new_config.yml");
         return;
     }
-    
+
     let source_path = &args[1];
     let target_path = &args[2];
-    
+
     match migrate_config(source_path, target_path) {
         Ok(_) => {
-            info!("Successfully migrated configuration from {} to {}", source_path, target_path);
+            info!(
+                "Successfully migrated configuration from {} to {}",
+                source_path, target_path
+            );
         }
         Err(err) => {
             info!("Error migrating configuration: {}", err);
@@ -34,12 +37,15 @@ fn migrate_config(source_path: &str, target_path: &str) -> Result<(), Box<dyn st
     if !Path::new(source_path).exists() {
         return Err(format!("Source file does not exist: {}", source_path).into());
     }
-    
+
     // Read source file
     let source_content = fs::read_to_string(source_path)?;
-    
+
     // Parse source file based on extension
-    let source_ext = Path::new(source_path).extension().and_then(|ext| ext.to_str()).unwrap_or("");
+    let source_ext = Path::new(source_path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("");
     let source_value: Value = match source_ext {
         "yml" | "yaml" => serde_yaml::from_str(&source_content)?,
         "json" => serde_json::from_str(&source_content)?,
@@ -49,14 +55,17 @@ fn migrate_config(source_path: &str, target_path: &str) -> Result<(), Box<dyn st
         }
         _ => return Err(format!("Unsupported source file format: {}", source_ext).into()),
     };
-    
+
     // Check if target file exists
     let target_exists = Path::new(target_path).exists();
-    
+
     // If target file exists, read it and merge with source
     let mut target_value = if target_exists {
         let target_content = fs::read_to_string(target_path)?;
-        let target_ext = Path::new(target_path).extension().and_then(|ext| ext.to_str()).unwrap_or("");
+        let target_ext = Path::new(target_path)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("");
         match target_ext {
             "yml" | "yaml" => serde_yaml::from_str(&target_content)?,
             "json" => serde_json::from_str(&target_content)?,
@@ -70,15 +79,18 @@ fn migrate_config(source_path: &str, target_path: &str) -> Result<(), Box<dyn st
         // If target file doesn't exist, use an empty object
         serde_json::json!({})
     };
-    
+
     // Merge source into target
     merge_json(&mut target_value, &source_value);
-    
+
     // Encrypt sensitive values
     secrets::process_json_for_encryption(&mut target_value)?;
-    
+
     // Write target file based on extension
-    let target_ext = Path::new(target_path).extension().and_then(|ext| ext.to_str()).unwrap_or("");
+    let target_ext = Path::new(target_path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("");
     match target_ext {
         "yml" | "yaml" => {
             let yaml_content = serde_yaml::to_string(&target_value)?;
@@ -97,7 +109,7 @@ fn migrate_config(source_path: &str, target_path: &str) -> Result<(), Box<dyn st
         }
         _ => return Err(format!("Unsupported target file format: {}", target_ext).into()),
     }
-    
+
     Ok(())
 }
 

@@ -14,15 +14,21 @@ mod tests {
 
         // Call the function and check that it returns an error
         let result = create_calendar_hub(&config).await;
-        assert!(result.is_err(), "Should return an error when key_path is missing");
+        assert!(
+            result.is_err(),
+            "Should return an error when key_path is missing"
+        );
 
         // Check the error message
         match result {
             Ok(_) => panic!("Expected an error but got Ok"),
             Err(err) => {
                 let err_string = err.to_string();
-                assert!(err_string.contains("Missing key_path"), 
-                        "Error message should mention missing key_path, got: {}", err_string);
+                assert!(
+                    err_string.contains("Missing key_path"),
+                    "Error message should mention missing key_path, got: {}",
+                    err_string
+                );
             }
         }
     }
@@ -38,7 +44,10 @@ mod tests {
 
         // Call the function and check that it returns an error
         let result = create_calendar_hub(&config).await;
-        assert!(result.is_err(), "Should return an error when key_path is invalid");
+        assert!(
+            result.is_err(),
+            "Should return an error when key_path is invalid"
+        );
 
         // Check that the error is related to file not found
         // The exact error message might vary depending on the OS and implementation
@@ -46,9 +55,14 @@ mod tests {
             Ok(_) => panic!("Expected an error but got Ok"),
             Err(err) => {
                 let err_string = err.to_string();
-                assert!(err_string.contains("No such file") || err_string.contains("not found") || 
-                        err_string.contains("cannot find") || err_string.contains("doesn't exist"),
-                        "Error message should indicate file not found, got: {}", err_string);
+                assert!(
+                    err_string.contains("No such file")
+                        || err_string.contains("not found")
+                        || err_string.contains("cannot find")
+                        || err_string.contains("doesn't exist"),
+                    "Error message should indicate file not found, got: {}",
+                    err_string
+                );
             }
         }
     }

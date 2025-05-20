@@ -1,9 +1,8 @@
 // --- File: crates/connectify_stripe/src/logic.rs ---
+use chrono::{DateTime, Utc};
 use connectify_config::{AppConfig, StripeConfig}; //, PriceTier};
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
-use tracing::{error, info};
 #[allow(unused_imports)]
 #[cfg(feature = "openapi")]
 use serde_json::json;
@@ -14,6 +13,7 @@ use std::{
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
+use tracing::{error, info};
 
 // Import the StripeError from the error module
 use crate::error::StripeError;
@@ -263,7 +263,8 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 /// Processes a verified Stripe webhook event.
 pub async fn process_stripe_webhook(
     event: StripeEvent,
-    app_config: Arc<AppConfig>, ) -> Result<(), StripeError> {
+    app_config: Arc<AppConfig>,
+) -> Result<(), StripeError> {
     info!("Processing Stripe event type: {}", event.event_type);
 
     match event.event_type.as_str() {
@@ -356,8 +357,7 @@ pub async fn process_stripe_webhook(
                                 info!("[Stripe Webhook] Fulfillment call for session {} (type: {}) failed: {} - {}", session.id, ff_type, status, err_text);
                                 return Err(StripeError::FulfillmentError(format!(
                                     "Fulfillment service call failed: {} - {}",
-                                    status,
-                                    err_text
+                                    status, err_text
                                 )));
                             }
                             Err(e) => {
@@ -407,7 +407,10 @@ pub async fn create_checkout_session(
     stripe_config: &StripeConfig,
     request_data: CreateCheckoutSessionRequest,
 ) -> Result<CreateCheckoutSessionResponse, StripeError> {
-    info!("[Stripe Logic] Creating Checkout Session for fulfillment type: {}", request_data.fulfillment_type);
+    info!(
+        "[Stripe Logic] Creating Checkout Session for fulfillment type: {}",
+        request_data.fulfillment_type
+    );
 
     let stripe_secret_key = env::var("STRIPE_SECRET_KEY").map_err(|_| StripeError::ConfigError)?;
 
@@ -416,45 +419,89 @@ pub async fn create_checkout_session(
     let product_name: String;
     let currency: String;
 
-    if request_data.fulfillment_type == "gcal_booking" || request_data.fulfillment_type == "adhoc_gcal_twilio" {
-        let start_time_str = request_data.fulfillment_data.get("start_time").and_then(|v| v.as_str())
-            .ok_or_else(|| StripeError::InvalidFulfillmentDataForPricing("Missing start_time in fulfillment_data for GCal-based booking".to_string()))?;
-        let end_time_str = request_data.fulfillment_data.get("end_time").and_then(|v| v.as_str())
-            .ok_or_else(|| StripeError::InvalidFulfillmentDataForPricing("Missing end_time in fulfillment_data for GCal-based booking".to_string()))?;
+    if request_data.fulfillment_type == "gcal_booking"
+        || request_data.fulfillment_type == "adhoc_gcal_twilio"
+    {
+        let start_time_str = request_data
+            .fulfillment_data
+            .get("start_time")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                StripeError::InvalidFulfillmentDataForPricing(
+                    "Missing start_time in fulfillment_data for GCal-based booking".to_string(),
+                )
+            })?;
+        let end_time_str = request_data
+            .fulfillment_data
+            .get("end_time")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                StripeError::InvalidFulfillmentDataForPricing(
+                    "Missing end_time in fulfillment_data for GCal-based booking".to_string(),
+                )
+            })?;
 
         let start_dt = DateTime::parse_from_rfc3339(start_time_str)
-            .map_err(|e| StripeError::InvalidFulfillmentDataForPricing(format!("Invalid start_time format: {}", e)))?.with_timezone(&Utc);
+            .map_err(|e| {
+                StripeError::InvalidFulfillmentDataForPricing(format!(
+                    "Invalid start_time format: {}",
+                    e
+                ))
+            })?
+            .with_timezone(&Utc);
         let end_dt = DateTime::parse_from_rfc3339(end_time_str)
-            .map_err(|e| StripeError::InvalidFulfillmentDataForPricing(format!("Invalid end_time format: {}", e)))?.with_timezone(&Utc);
+            .map_err(|e| {
+                StripeError::InvalidFulfillmentDataForPricing(format!(
+                    "Invalid end_time format: {}",
+                    e
+                ))
+            })?
+            .with_timezone(&Utc);
 
         if end_dt <= start_dt {
-            return Err(StripeError::InvalidFulfillmentDataForPricing("End time must be after start time.".to_string()));
+            return Err(StripeError::InvalidFulfillmentDataForPricing(
+                "End time must be after start time.".to_string(),
+            ));
         }
         let duration_minutes = (end_dt - start_dt).num_minutes();
 
-        let tier = stripe_config.price_tiers.iter()
+        let tier = stripe_config
+            .price_tiers
+            .iter()
             .find(|t| t.duration_minutes == duration_minutes)
             .ok_or_else(|| StripeError::NoMatchingPriceTier(duration_minutes))?;
 
         unit_amount = tier.unit_amount;
         // Use product_name from tier, fallback to summary from fulfillment_data, then a generic default
-        product_name = tier.product_name.clone().unwrap_or_else(||
-            request_data.fulfillment_data.get("summary").and_then(|v| v.as_str()).map(String::from)
+        product_name = tier.product_name.clone().unwrap_or_else(|| {
+            request_data
+                .fulfillment_data
+                .get("summary")
+                .and_then(|v| v.as_str())
+                .map(String::from)
                 .unwrap_or_else(|| format!("Service - {} min", duration_minutes))
-        );
-        currency = tier.currency.clone().unwrap_or_else(||
-            stripe_config.default_currency.clone().unwrap_or_else(|| "chf".to_string())
-        ).to_lowercase();
+        });
+        currency = tier
+            .currency
+            .clone()
+            .unwrap_or_else(|| {
+                stripe_config
+                    .default_currency
+                    .clone()
+                    .unwrap_or_else(|| "chf".to_string())
+            })
+            .to_lowercase();
 
         info!("[Stripe Logic] Type: {}. Duration: {} mins. Tier: amount={}, product='{}', currency='{}'",
                  request_data.fulfillment_type, duration_minutes, unit_amount, product_name, currency);
-
     } else {
         // Handle other fulfillment types or default pricing if necessary in the future
-        return Err(StripeError::InvalidFulfillmentDataForPricing(format!("Unsupported fulfillment_type for dynamic pricing: {}", request_data.fulfillment_type)));
+        return Err(StripeError::InvalidFulfillmentDataForPricing(format!(
+            "Unsupported fulfillment_type for dynamic pricing: {}",
+            request_data.fulfillment_type
+        )));
     }
     // --- End Price and Product Name Determination ---
-
 
     let mut form_body: Vec<(String, String)> = Vec::new();
     form_body.push(("payment_method_types[]".to_string(), "card".to_string()));
@@ -463,8 +510,14 @@ pub async fn create_checkout_session(
     form_body.push(("cancel_url".to_string(), stripe_config.cancel_url.clone()));
 
     form_body.push(("line_items[0][price_data][currency]".to_string(), currency));
-    form_body.push(("line_items[0][price_data][product_data][name]".to_string(), product_name));
-    form_body.push(("line_items[0][price_data][unit_amount]".to_string(), unit_amount.to_string()));
+    form_body.push((
+        "line_items[0][price_data][product_data][name]".to_string(),
+        product_name,
+    ));
+    form_body.push((
+        "line_items[0][price_data][unit_amount]".to_string(),
+        unit_amount.to_string(),
+    ));
     form_body.push(("line_items[0][quantity]".to_string(), "1".to_string()));
 
     if let Some(client_ref_id) = &request_data.client_reference_id {
@@ -472,9 +525,14 @@ pub async fn create_checkout_session(
     }
 
     // Store fulfillment information in Stripe metadata
-    form_body.push(("metadata[ff_type]".to_string(), request_data.fulfillment_type.clone()));
-    let fulfillment_data_str = serde_json::to_string(&request_data.fulfillment_data)
-        .map_err(|e| StripeError::InternalError(format!("Failed to serialize fulfillment_data: {}", e)))?;
+    form_body.push((
+        "metadata[ff_type]".to_string(),
+        request_data.fulfillment_type.clone(),
+    ));
+    let fulfillment_data_str =
+        serde_json::to_string(&request_data.fulfillment_data).map_err(|e| {
+            StripeError::InternalError(format!("Failed to serialize fulfillment_data: {}", e))
+        })?;
     form_body.push(("metadata[ff_data_json]".to_string(), fulfillment_data_str));
 
     let api_url = "https://api.stripe.com/v1/checkout/sessions";
@@ -495,25 +553,50 @@ pub async fn create_checkout_session(
 
     info!("[Stripe Logic] Stripe API response status: {}", status);
     if !status.is_success() {
-        info!("[Stripe Logic] Stripe API response body (raw): {}", body_text);
+        info!(
+            "[Stripe Logic] Stripe API response body (raw): {}",
+            body_text
+        );
     }
 
     if status.is_success() {
         let stripe_response: StripeCheckoutSessionApiResponse = serde_json::from_str(&body_text)?;
         if let Some(url) = stripe_response.url {
-            info!("[Stripe Logic] Stripe Checkout Session created successfully. URL: {}", url);
-            Ok(CreateCheckoutSessionResponse { url, session_id: stripe_response.id })
+            info!(
+                "[Stripe Logic] Stripe Checkout Session created successfully. URL: {}",
+                url
+            );
+            Ok(CreateCheckoutSessionResponse {
+                url,
+                session_id: stripe_response.id,
+            })
         } else {
-            info!("[Stripe Logic] Stripe response missing checkout session URL: {}", body_text);
-            Err(StripeError::InternalError("Stripe response missing checkout URL".to_string()))
+            info!(
+                "[Stripe Logic] Stripe response missing checkout session URL: {}",
+                body_text
+            );
+            Err(StripeError::InternalError(
+                "Stripe response missing checkout URL".to_string(),
+            ))
         }
     } else {
         let error_message = match serde_json::from_str::<serde_json::Value>(&body_text) {
-            Ok(json_body) => json_body.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str()).unwrap_or(&body_text).to_string(),
+            Ok(json_body) => json_body
+                .get("error")
+                .and_then(|e| e.get("message"))
+                .and_then(|m| m.as_str())
+                .unwrap_or(&body_text)
+                .to_string(),
             Err(_) => body_text,
         };
-        info!("[Stripe Logic] Stripe API request failed with HTTP status: {}. Message: {}", status, error_message);
-        Err(StripeError::ApiError { status_code: status.as_u16(), message: error_message })
+        info!(
+            "[Stripe Logic] Stripe API request failed with HTTP status: {}. Message: {}",
+            status, error_message
+        );
+        Err(StripeError::ApiError {
+            status_code: status.as_u16(),
+            message: error_message,
+        })
     }
 }
 
@@ -521,7 +604,8 @@ pub async fn create_checkout_session(
 // This is a more complete version of StripeCheckoutSessionObject
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[cfg_attr(feature = "openapi", derive(ToSchema))]
-pub struct StripeCheckoutSessionData { // Renamed for clarity
+pub struct StripeCheckoutSessionData {
+    // Renamed for clarity
     pub id: String,
     pub object: String, // "checkout.session"
     pub amount_total: Option<i64>,
@@ -531,7 +615,7 @@ pub struct StripeCheckoutSessionData { // Renamed for clarity
     pub metadata: Option<HashMap<String, String>>,
     pub payment_intent: Option<String>,
     pub payment_status: Option<String>, // e.g., "paid", "unpaid", "no_payment_required"
-    pub status: Option<String>, // e.g., "open", "complete", "expired"
+    pub status: Option<String>,         // e.g., "open", "complete", "expired"
     pub success_url: Option<String>,
     pub cancel_url: Option<String>,
     pub client_reference_id: Option<String>,
@@ -540,10 +624,10 @@ pub struct StripeCheckoutSessionData { // Renamed for clarity
     // Add other fields you might want to display on the confirmation page
 }
 
-
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
-struct StripeCheckoutSessionApiResponse { // Used for session creation response
+struct StripeCheckoutSessionApiResponse {
+    // Used for session creation response
     pub id: String,
     pub url: Option<String>,
 }
@@ -554,10 +638,12 @@ pub async fn get_checkout_session_details(
     session_id: &str,
     // stripe_config: &StripeConfig, // Not strictly needed if secret key is from env
 ) -> Result<StripeCheckoutSessionData, StripeError> {
-    info!("[Stripe Logic] Retrieving Checkout Session details for ID: {}", session_id);
+    info!(
+        "[Stripe Logic] Retrieving Checkout Session details for ID: {}",
+        session_id
+    );
 
-    let stripe_secret_key = env::var("STRIPE_SECRET_KEY")
-        .map_err(|_| StripeError::ConfigError)?;
+    let stripe_secret_key = env::var("STRIPE_SECRET_KEY").map_err(|_| StripeError::ConfigError)?;
 
     let api_url = format!("https://api.stripe.com/v1/checkout/sessions/{}", session_id);
 
@@ -573,7 +659,9 @@ pub async fn get_checkout_session_details(
     if status.is_success() {
         let session_data: StripeCheckoutSessionData = serde_json::from_str(&body_text)?;
         // Optionally, verify payment_status here if needed for the confirmation page
-        if session_data.payment_status.as_deref() != Some("paid") && session_data.status.as_deref() != Some("complete") {
+        if session_data.payment_status.as_deref() != Some("paid")
+            && session_data.status.as_deref() != Some("complete")
+        {
             // This might happen if user hits success URL but payment is still processing or failed later
             info!("[Stripe Logic] Warning: Checkout session {} status is {:?}, payment_status is {:?}.",
                      session_id, session_data.status, session_data.payment_status);
@@ -582,11 +670,22 @@ pub async fn get_checkout_session_details(
         Ok(session_data)
     } else {
         let error_message = match serde_json::from_str::<serde_json::Value>(&body_text) {
-            Ok(json_body) => json_body.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str()).unwrap_or(&body_text).to_string(),
+            Ok(json_body) => json_body
+                .get("error")
+                .and_then(|e| e.get("message"))
+                .and_then(|m| m.as_str())
+                .unwrap_or(&body_text)
+                .to_string(),
             Err(_) => body_text,
         };
-        error!("[Stripe Logic] Failed to retrieve session {}: {} - {}", session_id, status, error_message);
-        Err(StripeError::ApiError { status_code: status.as_u16(), message: error_message })
+        error!(
+            "[Stripe Logic] Failed to retrieve session {}: {} - {}",
+            session_id, status, error_message
+        );
+        Err(StripeError::ApiError {
+            status_code: status.as_u16(),
+            message: error_message,
+        })
     }
 }
 
@@ -596,9 +695,15 @@ pub async fn get_checkout_session_details(
 pub struct ListSessionsAdminQuery {
     #[cfg_attr(feature = "openapi", param(example = 10, required = false))]
     pub limit: Option<u8>, // Stripe limit is 1-100
-    #[cfg_attr(feature = "openapi", param(example = "cs_test_a1...", required = false))]
+    #[cfg_attr(
+        feature = "openapi",
+        param(example = "cs_test_a1...", required = false)
+    )]
     pub starting_after: Option<String>,
-    #[cfg_attr(feature = "openapi", param(example = "cs_test_z0...", required = false))]
+    #[cfg_attr(
+        feature = "openapi",
+        param(example = "cs_test_z0...", required = false)
+    )]
     pub ending_before: Option<String>,
     // Add other Stripe list parameters as needed (e.g., created, customer, payment_intent)
     // pub customer: Option<String>,
@@ -614,7 +719,7 @@ pub struct StripeListObject<T> {
     pub data: Vec<T>,
     pub has_more: bool,
     pub url: String, // URL for this list, usually /v1/checkout/sessions
-    // next_page: Option<String>, // Stripe uses starting_after/ending_before for pagination
+                     // next_page: Option<String>, // Stripe uses starting_after/ending_before for pagination
 }
 
 // Type alias for the specific list response
@@ -624,10 +729,12 @@ pub type ListSessionsAdminResponse = StripeListObject<StripeCheckoutSessionData>
 pub async fn list_checkout_sessions_admin(
     query_params: ListSessionsAdminQuery,
 ) -> Result<ListSessionsAdminResponse, StripeError> {
-    info!("[Stripe Logic] Listing Checkout Sessions for admin. Params: {:?}", query_params);
+    info!(
+        "[Stripe Logic] Listing Checkout Sessions for admin. Params: {:?}",
+        query_params
+    );
 
-    let stripe_secret_key = env::var("STRIPE_SECRET_KEY")
-        .map_err(|_| StripeError::ConfigError)?;
+    let stripe_secret_key = env::var("STRIPE_SECRET_KEY").map_err(|_| StripeError::ConfigError)?;
 
     let base_url = "https://api.stripe.com/v1/checkout/sessions";
 
@@ -660,10 +767,21 @@ pub async fn list_checkout_sessions_admin(
         Ok(list_response)
     } else {
         let error_message = match serde_json::from_str::<serde_json::Value>(&body_text) {
-            Ok(json_body) => json_body.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str()).unwrap_or(&body_text).to_string(),
+            Ok(json_body) => json_body
+                .get("error")
+                .and_then(|e| e.get("message"))
+                .and_then(|m| m.as_str())
+                .unwrap_or(&body_text)
+                .to_string(),
             Err(_) => body_text,
         };
-        error!("[Stripe Logic] Failed to list sessions: {} - {}", status, error_message);
-        Err(StripeError::ApiError { status_code: status.as_u16(), message: error_message })
+        error!(
+            "[Stripe Logic] Failed to list sessions: {} - {}",
+            status, error_message
+        );
+        Err(StripeError::ApiError {
+            status_code: status.as_u16(),
+            message: error_message,
+        })
     }
 }

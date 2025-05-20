@@ -5,8 +5,8 @@
 //! with consistent naming patterns and for converting between different naming
 //! patterns.
 
-use tracing::info;
 use std::env;
+use tracing::info;
 
 /// The default prefix for configuration environment variables
 pub const DEFAULT_PREFIX: &str = "CONNECTIFY";
@@ -131,11 +131,11 @@ pub fn get_secret_env_var(path: &str) -> Option<String> {
 /// `true` if the path is a secret path, `false` otherwise
 pub fn is_secret_path(path: &str) -> bool {
     let path_lower = path.to_lowercase();
-    path_lower.contains("secret") ||
-    path_lower.contains("key") ||
-    path_lower.contains("password") ||
-    path_lower.contains("token") ||
-    path_lower.contains("sid")
+    path_lower.contains("secret")
+        || path_lower.contains("key")
+        || path_lower.contains("password")
+        || path_lower.contains("token")
+        || path_lower.contains("sid")
 }
 
 /// Get an environment variable for a path

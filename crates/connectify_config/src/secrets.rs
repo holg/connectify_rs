@@ -1,13 +1,13 @@
-use tracing::info;
+use base64::{engine::general_purpose, Engine as _};
+use ring::aead::{self, BoundKey, Nonce, NonceSequence, SealingKey, UnboundKey};
+use ring::error::Unspecified;
+use ring::rand::{SecureRandom, SystemRandom};
+use serde_json::Value;
 use std::env;
 use std::fmt;
 use std::fs;
 use std::path::Path;
-use ring::aead::{self, BoundKey, Nonce, NonceSequence, SealingKey, UnboundKey};
-use ring::error::Unspecified;
-use ring::rand::{SecureRandom, SystemRandom};
-use base64::{engine::general_purpose, Engine as _};
-use serde_json::Value;
+use tracing::info;
 
 /// Error type for secret management operations
 #[derive(Debug)]
@@ -84,10 +84,10 @@ impl NonceSequence for CounterNonceSequence {
         let mut nonce_bytes = [0u8; 12]; // 96 bits
         let counter = self.counter;
         self.counter += 1;
-        
+
         // Use the counter as the last 8 bytes of the nonce
         nonce_bytes[4..].copy_from_slice(&counter.to_be_bytes());
-        
+
         Nonce::try_assume_unique_for_key(&nonce_bytes)
     }
 }
@@ -103,16 +103,16 @@ fn get_encryption_key() -> Result<[u8; 32], SecretError> {
                 key_bytes.len()
             )));
         }
-        
+
         let mut key = [0u8; 32];
         key.copy_from_slice(&key_bytes);
         return Ok(key);
     }
-    
+
     // If not found in environment, check for a key file
     let key_path = env::var("CONNECTIFY_ENCRYPTION_KEY_PATH")
         .unwrap_or_else(|_| ".connectify_key".to_string());
-    
+
     if Path::new(&key_path).exists() {
         let key_b64 = fs::read_to_string(&key_path)?;
         let key_bytes = general_purpose::STANDARD.decode(key_b64.trim())?;
@@ -122,25 +122,26 @@ fn get_encryption_key() -> Result<[u8; 32], SecretError> {
                 key_bytes.len()
             )));
         }
-        
+
         let mut key = [0u8; 32];
         key.copy_from_slice(&key_bytes);
         return Ok(key);
     }
-    
+
     // Generate a new key
     let rng = SystemRandom::new();
     let mut key = [0u8; 32];
-    rng.fill(&mut key).map_err(|_| SecretError::KeyError("Failed to generate encryption key".to_string()))?;
-    
+    rng.fill(&mut key)
+        .map_err(|_| SecretError::KeyError("Failed to generate encryption key".to_string()))?;
+
     // Save the key to a file
     let key_b64 = general_purpose::STANDARD.encode(&key);
     fs::write(&key_path, &key_b64)?;
-    
+
     info!("Generated new encryption key and saved to {}", key_path);
     info!("For production, set the CONNECTIFY_ENCRYPTION_KEY environment variable to:");
     info!("{}", key_b64);
-    
+
     Ok(key)
 }
 
@@ -149,18 +150,19 @@ pub fn encrypt_string(plaintext: &str) -> Result<String, SecretError> {
     let key = get_encryption_key()?;
     let unbound_key = UnboundKey::new(&aead::AES_256_GCM, &key)
         .map_err(|_| SecretError::EncryptionError("Failed to create encryption key".to_string()))?;
-    
+
     let mut sealing_key = SealingKey::new(unbound_key, CounterNonceSequence::new());
-    
+
     let mut in_out = plaintext.as_bytes().to_vec();
     let tag_len = aead::AES_256_GCM.tag_len();
-    
+
     // Reserve space for the authentication tag
     in_out.extend(std::iter::repeat(0).take(tag_len));
-    
-    sealing_key.seal_in_place_append_tag(aead::Aad::empty(), &mut in_out)
+
+    sealing_key
+        .seal_in_place_append_tag(aead::Aad::empty(), &mut in_out)
         .map_err(|_| SecretError::EncryptionError("Failed to encrypt data".to_string()))?;
-    
+
     // Encode the result as base64
     Ok(general_purpose::STANDARD.encode(&in_out))
 }
@@ -170,20 +172,22 @@ pub fn decrypt_string(ciphertext_b64: &str) -> Result<String, SecretError> {
     let key = get_encryption_key()?;
     let unbound_key = UnboundKey::new(&aead::AES_256_GCM, &key)
         .map_err(|_| SecretError::DecryptionError("Failed to create decryption key".to_string()))?;
-    
+
     // Decode the base64 ciphertext
     let mut ciphertext = general_purpose::STANDARD.decode(ciphertext_b64)?;
-    
+
     // Create an opening key with a counter nonce sequence
     let mut opening_key = aead::OpeningKey::new(unbound_key, CounterNonceSequence::new());
-    
+
     // Decrypt the data
-    let plaintext = opening_key.open_in_place(aead::Aad::empty(), &mut ciphertext)
+    let plaintext = opening_key
+        .open_in_place(aead::Aad::empty(), &mut ciphertext)
         .map_err(|_| SecretError::DecryptionError("Failed to decrypt data".to_string()))?;
-    
+
     // Convert the plaintext bytes to a string
-    String::from_utf8(plaintext.to_vec())
-        .map_err(|_| SecretError::DecryptionError("Failed to convert decrypted data to string".to_string()))
+    String::from_utf8(plaintext.to_vec()).map_err(|_| {
+        SecretError::DecryptionError("Failed to convert decrypted data to string".to_string())
+    })
 }
 
 /// Marker for encrypted values in configuration files
@@ -268,44 +272,46 @@ fn should_encrypt(value: &str) -> bool {
     if value.is_empty() || value == "secret_from_env" {
         return false;
     }
-    
+
     // Encrypt strings that look like secrets
     // This is a simple heuristic and can be improved
-    value.contains("secret") || 
-    value.contains("key") || 
-    value.contains("password") || 
-    value.contains("token") ||
-    value.contains("sid")
+    value.contains("secret")
+        || value.contains("key")
+        || value.contains("password")
+        || value.contains("token")
+        || value.contains("sid")
 }
 
 /// Encrypt a configuration file
 pub fn encrypt_config_file(file_path: &str) -> Result<(), SecretError> {
     // Read the file
     let content = fs::read_to_string(file_path)?;
-    
+
     // Parse the YAML content to JSON
-    let yaml_value: Value = serde_yaml::from_str(&content)
-        .map_err(|e| SecretError::JsonError(serde_json::Error::io(std::io::Error::new(
+    let yaml_value: Value = serde_yaml::from_str(&content).map_err(|e| {
+        SecretError::JsonError(serde_json::Error::io(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!("Failed to parse YAML: {}", e),
-        ))))?;
-    
+        )))
+    })?;
+
     // Convert to JSON for processing
     let mut json_value = serde_json::to_value(yaml_value)?;
-    
+
     // Process the JSON value, encrypting all strings that match the secret pattern
     process_json_for_encryption(&mut json_value)?;
-    
+
     // Convert back to YAML
-    let yaml_content = serde_yaml::to_string(&json_value)
-        .map_err(|e| SecretError::JsonError(serde_json::Error::io(std::io::Error::new(
+    let yaml_content = serde_yaml::to_string(&json_value).map_err(|e| {
+        SecretError::JsonError(serde_json::Error::io(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!("Failed to convert to YAML: {}", e),
-        ))))?;
-    
+        )))
+    })?;
+
     // Write the encrypted content back to the file
     fs::write(file_path, yaml_content)?;
-    
+
     Ok(())
 }
 
@@ -315,10 +321,10 @@ pub fn encrypt_config_command(args: &[String]) -> Result<(), SecretError> {
         info!("Usage: encrypt_config <file_path>");
         return Ok(());
     }
-    
+
     let file_path = &args[1];
     encrypt_config_file(file_path)?;
-    
+
     info!("Successfully encrypted configuration file: {}", file_path);
     Ok(())
 }

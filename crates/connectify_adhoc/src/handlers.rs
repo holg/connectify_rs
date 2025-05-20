@@ -1,15 +1,15 @@
 // --- File: crates/connectify_adhoc/src/handlers.rs ---
+use crate::logic::{
+    initiate_adhoc_session_logic, AdhocSessionError, InitiateAdhocSessionRequest,
+    InitiateAdhocSessionResponse,
+};
 use axum::{
     extract::State,
-    response::{Json}, //, IntoResponse}, // Added Html, Response
     http::StatusCode,
+    response::Json, //, IntoResponse}, // Added Html, Response
 };
-use std::sync::Arc;
 use connectify_config::AppConfig;
-use crate::logic::{
-    initiate_adhoc_session_logic, InitiateAdhocSessionRequest,
-    InitiateAdhocSessionResponse, AdhocSessionError
-};
+use std::sync::Arc;
 
 // State for Adhoc handlers
 #[derive(Clone)]
@@ -37,10 +37,12 @@ pub async fn initiate_adhoc_session_handler(
     State(state): State<Arc<AdhocState>>,
     Json(payload): Json<InitiateAdhocSessionRequest>,
 ) -> Result<Json<InitiateAdhocSessionResponse>, (StatusCode, String)> {
-
     // Check main feature flag for adhoc sessions
     if !state.config.use_adhoc {
-        return Err((StatusCode::NOT_FOUND, "Adhoc session feature not enabled.".to_string()));
+        return Err((
+            StatusCode::NOT_FOUND,
+            "Adhoc session feature not enabled.".to_string(),
+        ));
     }
 
     match initiate_adhoc_session_logic(
@@ -48,14 +50,27 @@ pub async fn initiate_adhoc_session_handler(
         payload,
         #[cfg(feature = "gcal")]
         state.gcal_hub.clone(), // Pass the GCal Hub from state
-    ).await {
+    )
+    .await
+    {
         Ok(response) => Ok(Json(response)),
-        Err(AdhocSessionError::AdminDisabled) => Err((StatusCode::FORBIDDEN, AdhocSessionError::AdminDisabled.to_string())),
+        Err(AdhocSessionError::AdminDisabled) => Err((
+            StatusCode::FORBIDDEN,
+            AdhocSessionError::AdminDisabled.to_string(),
+        )),
         Err(AdhocSessionError::ConfigError(msg)) => Err((StatusCode::INTERNAL_SERVER_ERROR, msg)),
         Err(AdhocSessionError::GcalInteractionError(msg)) => Err((StatusCode::BAD_GATEWAY, msg)),
-        Err(AdhocSessionError::SlotUnavailable) => Err((StatusCode::CONFLICT, AdhocSessionError::SlotUnavailable.to_string())),
-        Err(AdhocSessionError::NoMatchingPriceTier(duration)) => Err((StatusCode::BAD_REQUEST, format!("No price for duration: {} minutes.", duration))),
-        Err(AdhocSessionError::StripeError(msg)) => Err((StatusCode::BAD_GATEWAY, format!("Stripe error: {}", msg))),
+        Err(AdhocSessionError::SlotUnavailable) => Err((
+            StatusCode::CONFLICT,
+            AdhocSessionError::SlotUnavailable.to_string(),
+        )),
+        Err(AdhocSessionError::NoMatchingPriceTier(duration)) => Err((
+            StatusCode::BAD_REQUEST,
+            format!("No price for duration: {} minutes.", duration),
+        )),
+        Err(AdhocSessionError::StripeError(msg)) => {
+            Err((StatusCode::BAD_GATEWAY, format!("Stripe error: {}", msg)))
+        }
         Err(AdhocSessionError::InternalError(msg)) => Err((StatusCode::INTERNAL_SERVER_ERROR, msg)),
     }
 }

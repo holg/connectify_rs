@@ -40,7 +40,10 @@ pub async fn routes(config: Arc<AppConfig>) -> Router {
         .route("/book", post(book_slot_handler))
         .route("/gcal/book", post(book_slot_handler))
         .route("/admin/delete/{event_id}", delete(delete_event_handler))
-        .route("/admin/gcal/delete/{event_id}", delete(delete_event_handler))
+        .route(
+            "/admin/gcal/delete/{event_id}",
+            delete(delete_event_handler),
+        )
         .route(
             "/admin/mark_cancelled/{event_id}",
             patch(mark_booking_cancelled_handler),

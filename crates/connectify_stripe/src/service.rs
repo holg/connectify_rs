@@ -1,11 +1,11 @@
-use std::sync::Arc;
+use crate::error::StripeError;
+use crate::logic::{create_checkout_session, CreateCheckoutSessionRequest};
+use connectify_common::services::{PaymentIntentResult, PaymentService, RefundResult};
+use connectify_config::AppConfig;
 use serde_json::Value;
 use std::future::Future;
 use std::pin::Pin;
-use connectify_common::services::{PaymentService, PaymentIntentResult, RefundResult};
-use connectify_config::AppConfig;
-use crate::logic::{create_checkout_session, CreateCheckoutSessionRequest};
-use crate::error::StripeError;
+use std::sync::Arc;
 
 /// Stripe payment service implementation
 pub struct StripePaymentService {
@@ -47,7 +47,10 @@ impl PaymentService for StripePaymentService {
             };
 
             // Use the existing create_checkout_session function
-            let stripe_config = self.config.stripe.as_ref()
+            let stripe_config = self
+                .config
+                .stripe
+                .as_ref()
                 .ok_or_else(|| StripeError::ConfigError)?;
 
             let checkout_result = create_checkout_session(stripe_config, request).await?;
@@ -71,9 +74,12 @@ impl PaymentService for StripePaymentService {
         Box::pin(async move {
             // This would need to be implemented with Stripe API
             // For now, return a placeholder
-            Err(StripeError::ApiError { 
-                status_code: 501, 
-                message: format!("Not implemented: confirm_payment_intent for {}", payment_intent_id) 
+            Err(StripeError::ApiError {
+                status_code: 501,
+                message: format!(
+                    "Not implemented: confirm_payment_intent for {}",
+                    payment_intent_id
+                ),
             })
         })
     }
@@ -86,9 +92,12 @@ impl PaymentService for StripePaymentService {
         Box::pin(async move {
             // This would need to be implemented with Stripe API
             // For now, return a placeholder
-            Err(StripeError::ApiError { 
-                status_code: 501, 
-                message: format!("Not implemented: cancel_payment_intent for {}", payment_intent_id) 
+            Err(StripeError::ApiError {
+                status_code: 501,
+                message: format!(
+                    "Not implemented: cancel_payment_intent for {}",
+                    payment_intent_id
+                ),
             })
         })
     }
@@ -104,10 +113,12 @@ impl PaymentService for StripePaymentService {
         Box::pin(async move {
             // This would need to be implemented with Stripe API
             // For now, return a placeholder
-            Err(StripeError::ApiError { 
-                status_code: 501, 
-                message: format!("Not implemented: create_refund for {} with amount {:?} and reason {:?}", 
-                    payment_intent_id, amount, reason) 
+            Err(StripeError::ApiError {
+                status_code: 501,
+                message: format!(
+                    "Not implemented: create_refund for {} with amount {:?} and reason {:?}",
+                    payment_intent_id, amount, reason
+                ),
             })
         })
     }

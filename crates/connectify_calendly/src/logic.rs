@@ -1,29 +1,27 @@
 // --- File: crates/connectify_calendly/src/logic.rs ---
 #![cfg(feature = "calendly")]
 
+use actix_web::{error, HttpRequest};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD as base64_engine, Engine};
+use chrono::{Duration, NaiveDate, Utc};
+use cookie::{Cookie, CookieJar, Key as CookieSignKey, SameSite};
+use http::Response as HttpResponseBuilder;
+use oauth2::{
+    basic::BasicTokenResponse, AuthorizationCode, CsrfToken, EndpointNotSet, EndpointSet,
+    HttpClientError as OAuth2HttpClientError, HttpRequest as OAuth2Request,
+    HttpResponse as OAuth2Response, Scope, TokenResponse,
+};
+use reqwest::{Client as ReqwestClient, Error as ReqwestError};
 use std::env;
 use std::sync::{Arc, RwLock};
-use chrono::{Duration, Utc, NaiveDate};
-use reqwest::{Client as ReqwestClient, Error as ReqwestError};
-use oauth2::{
-    AuthorizationCode, CsrfToken, Scope, TokenResponse,
-    basic::BasicTokenResponse,
-    HttpRequest as OAuth2Request, HttpResponse as OAuth2Response,
-    HttpClientError as OAuth2HttpClientError,
-    EndpointSet, EndpointNotSet,
-};
-use http::{Response as HttpResponseBuilder};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD as base64_engine, Engine};
-use cookie::{Cookie, CookieJar, Key as CookieSignKey, SameSite};
-use actix_web::{HttpRequest, error};
 use uuid::Uuid;
 
 use crate::models::{
-    CalendlyConfig, CalendlySlotsState, CalendlyTokenResponse, EventType,
-    SlotsQuery, AvailableSlot, SlotEventUrlCache, BookSlotRequest
+    AvailableSlot, BookSlotRequest, CalendlyConfig, CalendlySlotsState, CalendlyTokenResponse,
+    EventType, SlotEventUrlCache, SlotsQuery,
 };
-use crate::storage::{TokenStore, create_sqlite_token_store};
-use crate::utils::{crypto};
+use crate::storage::{create_sqlite_token_store, TokenStore};
+use crate::utils::crypto;
 
 // --- Constants ---
 pub const CSRF_COOKIE_NAME: &str = "calendly_csrf_state";
@@ -34,22 +32,35 @@ pub async fn async_http_client(
     request: OAuth2Request,
 ) -> Result<OAuth2Response, OAuth2HttpClientError<ReqwestError>> {
     let client = ReqwestClient::new();
-    let mut req_builder = client.request(request.method().clone(), request.uri().to_string()).headers(request.headers().clone());
+    let mut req_builder = client
+        .request(request.method().clone(), request.uri().to_string())
+        .headers(request.headers().clone());
     if !request.body().is_empty() {
         req_builder = req_builder.body(request.body().clone());
     }
-    let response = req_builder.send().await.map_err(|e| OAuth2HttpClientError::Reqwest(Box::new(e)))?;
+    let response = req_builder
+        .send()
+        .await
+        .map_err(|e| OAuth2HttpClientError::Reqwest(Box::new(e)))?;
     let status = response.status();
     let resp_headers = response.headers().clone();
-    let body_bytes = response.bytes().await.map_err(|e| OAuth2HttpClientError::Reqwest(Box::new(e)))?.to_vec();
+    let body_bytes = response
+        .bytes()
+        .await
+        .map_err(|e| OAuth2HttpClientError::Reqwest(Box::new(e)))?
+        .to_vec();
 
     let mut builder = HttpResponseBuilder::builder().status(status);
     let Some(builder_headers) = builder.headers_mut() else {
-        return Err(OAuth2HttpClientError::Other("Failed to access response builder headers".into()));
+        return Err(OAuth2HttpClientError::Other(
+            "Failed to access response builder headers".into(),
+        ));
     };
     *builder_headers = resp_headers;
 
-    builder.body(body_bytes).map_err(|e| OAuth2HttpClientError::Other(format!("Failed to build response: {e}").into()))
+    builder
+        .body(body_bytes)
+        .map_err(|e| OAuth2HttpClientError::Other(format!("Failed to build response: {e}").into()))
 }
 
 pub async fn exchange_code_for_token(
@@ -57,7 +68,9 @@ pub async fn exchange_code_for_token(
     config: &CalendlyConfig,
 ) -> Result<BasicTokenResponse, actix_web::Error> {
     let client = config.oauth_client() else {
-        return Err(error::ErrorInternalServerError("Calendly OAuth client init failed"));
+        return Err(error::ErrorInternalServerError(
+            "Calendly OAuth client init failed",
+        ));
     };
     let code = AuthorizationCode::new(code.to_owned());
 
@@ -73,7 +86,10 @@ pub async fn exchange_code_for_token(
     Ok(token_response)
 }
 
-pub fn extract_csrf_state(req: &HttpRequest, csrf_key: &CookieSignKey) -> Option<(CookieJar, String)> {
+pub fn extract_csrf_state(
+    req: &HttpRequest,
+    csrf_key: &CookieSignKey,
+) -> Option<(CookieJar, String)> {
     let mut jar = CookieJar::new();
     if let Some(cookie_header) = req.headers().get(actix_web::http::header::COOKIE) {
         if let Ok(cookie_str) = cookie_header.to_str() {
@@ -85,13 +101,20 @@ pub fn extract_csrf_state(req: &HttpRequest, csrf_key: &CookieSignKey) -> Option
         }
     }
 
-    let stored_encoded_state = jar.private(&csrf_key).get(CSRF_COOKIE_NAME)?.value().to_string();
+    let stored_encoded_state = jar
+        .private(&csrf_key)
+        .get(CSRF_COOKIE_NAME)?
+        .value()
+        .to_string();
     let decoded = base64_engine.decode(&stored_encoded_state).ok()?;
     let decoded_str = String::from_utf8(decoded).ok()?;
     Some((jar, decoded_str))
 }
 
-pub fn extract_csrf_state_fallback(req: &HttpRequest, expected: &str) -> Option<(CookieJar, String)> {
+pub fn extract_csrf_state_fallback(
+    req: &HttpRequest,
+    expected: &str,
+) -> Option<(CookieJar, String)> {
     let mut jar = CookieJar::new();
 
     let cookie_header = req.headers().get(actix_web::http::header::COOKIE)?;
@@ -163,11 +186,15 @@ pub fn print_calendly_oauth_url(config: &CalendlyConfig) {
 
 pub fn calculate_date_range(query: &SlotsQuery) -> (String, String) {
     let today = Utc::now().date_naive();
-    let start = query.start_date.clone()
+    let start = query
+        .start_date
+        .clone()
         .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
         .unwrap_or_else(|| today + Duration::days(1));
 
-    let end = query.end_date.clone()
+    let end = query
+        .end_date
+        .clone()
         .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
         .unwrap_or_else(|| start + Duration::days(6)); // keep range ≤ 7 days
 
@@ -203,15 +230,17 @@ pub async fn fetch_calendly_user_url(
         .bearer_auth(token)
         .send()
         .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to fetch user: {e}")))?;
+        .map_err(|e| {
+            actix_web::error::ErrorInternalServerError(format!("Failed to fetch user: {e}"))
+        })?;
 
-    let body = user_resp
-        .text()
-        .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to read response: {e}")))?;
+    let body = user_resp.text().await.map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Failed to read response: {e}"))
+    })?;
     info!("📦 Raw Calendly /me response:\n{}", body);
-    let me: MeResponse = serde_json::from_str(&body)
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to parse user: {e}")))?;
+    let me: MeResponse = serde_json::from_str(&body).map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Failed to parse user: {e}"))
+    })?;
     info!("User URI: {}", me.resource.uri);
     {
         let mut write_guard = state.calendly_user_url.write().unwrap();
@@ -230,25 +259,30 @@ pub async fn fetch_event_types(
         // 1. Prüfen, ob gecachte URIs vorhanden sind
         let cached = state.calendly_event_urls.read().unwrap();
         if !cached.is_empty() {
-            let events = cached.iter().map(|uri| EventType {
-                uri: uri.clone(),
-                name: "<cached>".to_string(), // Wir speichern Namen nicht im Cache
-            }).collect();
+            let events = cached
+                .iter()
+                .map(|uri| EventType {
+                    uri: uri.clone(),
+                    name: "<cached>".to_string(), // Wir speichern Namen nicht im Cache
+                })
+                .collect();
             return Ok(events);
         }
     }
     // 2. Sonst API Call machen
     let url = format!("https://api.calendly.com/event_types?user={}", user_uri);
-    let res = state.client
+    let res = state
+        .client
         .get(&url)
         .bearer_auth(token)
         .send()
         .await
         .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed request: {e}")))?;
 
-    let body = res.text().await.map_err(|e| {
-        actix_web::error::ErrorInternalServerError(format!("Body read error: {e}"))
-    })?;
+    let body = res
+        .text()
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Body read error: {e}")))?;
 
     let parsed: crate::models::EventTypesResponse = serde_json::from_str(&body).map_err(|e| {
         actix_web::error::ErrorInternalServerError(format!("JSON parse error: {e}"))
@@ -280,7 +314,10 @@ pub async fn fetch_availability_for_event(
 
     let mut slots = Vec::new();
     let resp = client.get(&url).bearer_auth(token).send().await;
-    info!("�� Raw Calendly /event_type_available_times response:\n{:?}", resp);
+    info!(
+        "�� Raw Calendly /event_type_available_times response:\n{:?}",
+        resp
+    );
     if let Ok(resp) = resp {
         if resp.status().is_success() {
             if let Ok(parsed) = resp.json::<crate::models::AvailableTimesResponse>().await {
@@ -300,24 +337,23 @@ pub async fn fetch_availability_for_event(
     slots
 }
 
-pub async fn get_default_user_token(
-    config: &CalendlyConfig,
-) -> Result<String, actix_web::Error> {
-    let token_store = create_sqlite_token_store(
-        &config.database_url,
-        config.encryption_key.to_vec()
-    ).await.unwrap();
+pub async fn get_default_user_token(config: &CalendlyConfig) -> Result<String, actix_web::Error> {
+    let token_store =
+        create_sqlite_token_store(&config.database_url, config.encryption_key.to_vec())
+            .await
+            .unwrap();
 
-    let (access_token, refresh_token_opt, expires_at_opt) =
-        token_store.get_token_decrypted("default_calendly_user", "calendly").await
-            .map_err(|e| {
-                info!("❌ Failed to load token: {e}");
-                actix_web::error::ErrorInternalServerError("DB error")
-            })?
-            .ok_or_else(|| {
-                info!("❌ Token not found for default_calendly_user");
-                actix_web::error::ErrorUnauthorized("Calendly token missing")
-            })?;
+    let (access_token, refresh_token_opt, expires_at_opt) = token_store
+        .get_token_decrypted("default_calendly_user", "calendly")
+        .await
+        .map_err(|e| {
+            info!("❌ Failed to load token: {e}");
+            actix_web::error::ErrorInternalServerError("DB error")
+        })?
+        .ok_or_else(|| {
+            info!("❌ Token not found for default_calendly_user");
+            actix_web::error::ErrorUnauthorized("Calendly token missing")
+        })?;
 
     let now = chrono::Utc::now().timestamp();
     let is_expired = expires_at_opt.map(|exp| exp <= now).unwrap_or(true);
@@ -331,8 +367,10 @@ pub async fn get_default_user_token(
                 actix_web::error::ErrorInternalServerError("Missing refresh_token")
             })?,
         )
-            .await
-            .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Token refresh failed: {e}")))?;
+        .await
+        .map_err(|e| {
+            actix_web::error::ErrorInternalServerError(format!("Token refresh failed: {e}"))
+        })?;
 
         let new_access = new_token.access_token.clone();
         let new_refresh = new_token.refresh_token.clone();
@@ -358,9 +396,10 @@ pub async fn get_default_user_token(
 }
 
 pub fn get_personal_access_token(config: &CalendlyConfig) -> Option<String> {
-    config.personal_token.as_ref().and_then(|bytes| {
-        String::from_utf8(bytes.clone()).ok()
-    })
+    config
+        .personal_token
+        .as_ref()
+        .and_then(|bytes| String::from_utf8(bytes.clone()).ok())
 }
 
 // --- Configuration Logic ---
@@ -375,27 +414,33 @@ impl CalendlyConfig {
             .map_err(|_| "Missing CALENDLY_CLIENT_SECRET".to_string())?;
         let redirect_uri = env::var("CALENDLY_REDIRECT_URI")
             .map_err(|_| "Missing CALENDLY_REDIRECT_URI".to_string())
-            .and_then(|u| oauth2::RedirectUrl::new(u).map_err(|_| "Invalid CALENDLY_REDIRECT_URI".to_string()))?;
+            .and_then(|u| {
+                oauth2::RedirectUrl::new(u).map_err(|_| "Invalid CALENDLY_REDIRECT_URI".to_string())
+            })?;
 
-        let csrf_key_raw = env::var("CSRF_STATE_SECRET").map_err(|_| "Missing CSRF_STATE_SECRET".to_string())?;
+        let csrf_key_raw =
+            env::var("CSRF_STATE_SECRET").map_err(|_| "Missing CSRF_STATE_SECRET".to_string())?;
         if csrf_key_raw.len() < 32 {
             return Err("CSRF_STATE_SECRET must be at least 32 bytes.".into());
         }
         let csrf_state_key = CookieSignKey::from(csrf_key_raw.as_bytes());
 
-        let auth_url = oauth2::AuthUrl::new("https://auth.calendly.com/oauth/authorize".to_string())
-            .map_err(|_| "Invalid Auth URL".to_string())?;
+        let auth_url =
+            oauth2::AuthUrl::new("https://auth.calendly.com/oauth/authorize".to_string())
+                .map_err(|_| "Invalid Auth URL".to_string())?;
         let token_url = oauth2::TokenUrl::new("https://auth.calendly.com/oauth/token".to_string())
             .map_err(|_| "Invalid Token URL".to_string())?;
 
-        let database_url = env::var("DATABASE_URL")
-            .map_err(|_| "Missing DATABASE_URL".to_string())?;
-        let encryption_key_hex = env::var("ENCRYPTION_KEY")
-            .map_err(|_| "Missing ENCRYPTION_KEY".to_string())?;
+        let database_url =
+            env::var("DATABASE_URL").map_err(|_| "Missing DATABASE_URL".to_string())?;
+        let encryption_key_hex =
+            env::var("ENCRYPTION_KEY").map_err(|_| "Missing ENCRYPTION_KEY".to_string())?;
         let encryption_key = hex::decode(encryption_key_hex)
             .map_err(|_| "ENCRYPTION_KEY must be hex-encoded".to_string())?;
 
-        let personal_token = env::var("CALENDLY_PERSONAL_TOKEN").ok().map(|s| s.into_bytes());
+        let personal_token = env::var("CALENDLY_PERSONAL_TOKEN")
+            .ok()
+            .map(|s| s.into_bytes());
 
         Ok(Self {
             client_id,
@@ -410,7 +455,15 @@ impl CalendlyConfig {
         })
     }
 
-    pub fn oauth_client(&self) -> oauth2::basic::BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet> {
+    pub fn oauth_client(
+        &self,
+    ) -> oauth2::basic::BasicClient<
+        EndpointSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointSet,
+    > {
         oauth2::basic::BasicClient::new(self.client_id.clone())
             .set_client_secret(self.client_secret.clone())
             .set_auth_uri(self.auth_url.clone())
@@ -420,17 +473,16 @@ impl CalendlyConfig {
 }
 
 pub async fn create_token_store(config: &CalendlyConfig) -> Arc<dyn TokenStore> {
-    Arc::new(create_sqlite_token_store(
-        &config.database_url,
-        config.encryption_key.clone(),
+    Arc::new(
+        create_sqlite_token_store(&config.database_url, config.encryption_key.clone())
+            .await
+            .expect("Failed to create token store"),
     )
-    .await
-    .expect("Failed to create token store"))
 }
 
 pub fn create_slots_state(config: &CalendlyConfig) -> CalendlySlotsState {
     let personal_token = get_personal_access_token(config).unwrap_or_default();
-    
+
     CalendlySlotsState {
         calendly_personal_token: personal_token,
         calendly_event_urls: Arc::new(RwLock::new(Vec::new())),

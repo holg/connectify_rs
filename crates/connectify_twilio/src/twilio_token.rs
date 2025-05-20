@@ -7,6 +7,7 @@ use axum::{
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
+use connectify_config::AppConfig;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -14,7 +15,6 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use tracing::info;
-use connectify_config::AppConfig;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct VideoGrant {

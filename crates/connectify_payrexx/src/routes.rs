@@ -1,6 +1,9 @@
 // --- File: crates/connectify_payrexx/src/routes.rs ---
 
-use axum::{routing::{post, get}, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use connectify_config::AppConfig;
 use std::sync::Arc; // Need AppConfig for state
                     // Removed: use reqwest::Client; // No longer needed as parameter

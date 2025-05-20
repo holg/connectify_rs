@@ -1,38 +1,27 @@
 // File: services/connectify_backend/src/main.rs
 use axum::{routing::get, Router};
-use connectify_config::load_config;
-use connectify_common::{logging, is_feature_enabled};
-use tracing::{info, warn};//, error};
-#[cfg(feature = "twilio")]
-use connectify_twilio;
-#[cfg(feature = "gcal")]
-use connectify_gcal;
 #[cfg(feature = "adhoc")]
 use connectify_adhoc;
-// #[cfg(feature = "stripe")]
-// use connectify_stripe::routes as stripe_routes;
-// #[cfg(feature = "fulfillment")]
-// use connectify_fulfillment::routes as fulfillment_routes;
-// #[cfg(feature = "payrexx")]
-// use connectify_payrexx::routes as payrexx_routes;
+use connectify_common::{is_feature_enabled, logging};
+use connectify_config::load_config;
+#[cfg(feature = "gcal")]
+use connectify_gcal;
+#[cfg(feature = "twilio")]
+use connectify_twilio;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
+use tracing::{info, warn};
 // use axum::{extract::State, Json};
 
 // Import the AppState and AppStateBuilder from the app_state module
 mod app_state;
 use app_state::AppState;
 
-
-
-
 // #[axum::debug_handler]
 // async fn show_config(State(config): State<Arc<AppConfig>>) -> Json<AppConfig> {
 //     Json(config.as_ref().clone())
 // }
-
-
 
 #[tokio::main]
 async fn main() {
@@ -49,10 +38,10 @@ async fn main() {
     #[allow(unused_variables)]
     let app_state = AppState::new(config.clone()).await;
 
-    let mut api_router = Router::new()
-        .route("/", get(|| async { "Welcome to Connectify-Rs API!" }));
-        // .route("/config", get(show_config))
-        // .with_state(config.clone()); we manage the State now with app_state
+    let mut api_router =
+        Router::new().route("/", get(|| async { "Welcome to Connectify-Rs API!" }));
+    // .route("/config", get(show_config))
+    // .with_state(config.clone()); we manage the State now with app_state
     // Conditionally merge Twilio routes
     #[cfg(feature = "twilio")]
     {
@@ -67,12 +56,16 @@ async fn main() {
     {
         // GCal routes take Arc<GcalState> as state
         #[allow(unused_variables)]
-        if let Some(gcal_state_ref) = app_state.gcal_state.as_ref() { // Check if GcalState was initialized
-            if is_feature_enabled(&config, config.use_gcal, config.gcal.as_ref()) { // Check runtime flags
+        if let Some(gcal_state_ref) = app_state.gcal_state.as_ref() {
+            // Check if GcalState was initialized
+            if is_feature_enabled(&config, config.use_gcal, config.gcal.as_ref()) {
+                // Check runtime flags
                 info!("🔌 Merging GCal routes...");
-                api_router = api_router.merge(connectify_gcal::routes::routes(config.clone()).await);
+                api_router =
+                    api_router.merge(connectify_gcal::routes::routes(config.clone()).await);
             }
-        } else if is_feature_enabled(&config, config.use_gcal, config.gcal.as_ref()) { // Log if enabled but state failed
+        } else if is_feature_enabled(&config, config.use_gcal, config.gcal.as_ref()) {
+            // Log if enabled but state failed
             warn!("ℹ️ GCal routes not merged (GCal state initialization failed).");
         }
     }
@@ -103,9 +96,7 @@ async fn main() {
             #[cfg(not(feature = "gcal"))]
             {
                 // When gcal feature is not enabled, call with just one argument
-                api_router = api_router.merge(connectify_fulfillment::routes(
-                    config.clone(),
-                ));
+                api_router = api_router.merge(connectify_fulfillment::routes(config.clone()));
             }
             #[cfg(feature = "gcal")]
             {
@@ -127,19 +118,18 @@ async fn main() {
             #[cfg(not(feature = "gcal"))]
             {
                 // When gcal feature is not enabled, call with just one argument
-                api_router = api_router.merge(connectify_adhoc::routes(
-                    config.clone(),
-                ));
+                api_router = api_router.merge(connectify_adhoc::routes(config.clone()));
             }
             // When both adhoc and gcal features are enabled, but not adhoc_gcal
             #[cfg(feature = "gcal")]
             {
                 info!("🔌 Merging GCal Adhoc routes...");
-                let gcal_hub_option = app_state.gcal_state.as_ref().map(|state| state.calendar_hub.clone());
-                api_router = api_router.merge(connectify_adhoc::routes(
-                    config.clone(),
-                    gcal_hub_option,
-                ));
+                let gcal_hub_option = app_state
+                    .gcal_state
+                    .as_ref()
+                    .map(|state| state.calendar_hub.clone());
+                api_router =
+                    api_router.merge(connectify_adhoc::routes(config.clone(), gcal_hub_option));
             }
         }
     }
@@ -151,18 +141,18 @@ async fn main() {
     // Conditionally add Swagger UI and JSON endpoint if openapi feature enabled
     #[cfg(feature = "openapi")]
     {
-        #[cfg(feature = "twilio")]
-        use connectify_twilio::doc::TwilioApiDoc;
-        #[cfg(feature = "gcal")]
-        use connectify_gcal::doc::GcalApiDoc;
-        #[cfg(feature = "stripe")]
-        use connectify_stripe::doc::StripeApiDoc;
-        #[cfg(feature = "fulfillment")]
-        use connectify_fulfillment::doc::FulfillmentApiDoc;
-        #[cfg(feature = "payrexx")]
-        use connectify_payrexx::doc::PayrexxApiDoc;
         #[cfg(feature = "adhoc")]
         use connectify_adhoc::doc::AdhocApiDoc;
+        #[cfg(feature = "fulfillment")]
+        use connectify_fulfillment::doc::FulfillmentApiDoc;
+        #[cfg(feature = "gcal")]
+        use connectify_gcal::doc::GcalApiDoc;
+        #[cfg(feature = "payrexx")]
+        use connectify_payrexx::doc::PayrexxApiDoc;
+        #[cfg(feature = "stripe")]
+        use connectify_stripe::doc::StripeApiDoc;
+        #[cfg(feature = "twilio")]
+        use connectify_twilio::doc::TwilioApiDoc;
         use utoipa::OpenApi;
         use utoipa_swagger_ui::SwaggerUi;
 
@@ -199,8 +189,8 @@ async fn main() {
         info!("📖 Adding Swagger UI at /admin/api/docs");
 
         // Create the Swagger UI route, referencing the merged doc
-        let swagger_ui =
-            SwaggerUi::new("/admin/api/docs").url("/admin/api/docs/openapi.json", openapi_doc.clone());
+        let swagger_ui = SwaggerUi::new("/admin/api/docs")
+            .url("/admin/api/docs/openapi.json", openapi_doc.clone());
         // Merge the Swagger UI into the main app router
         app = app.merge(swagger_ui);
     }

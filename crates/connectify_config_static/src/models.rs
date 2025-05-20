@@ -63,7 +63,7 @@ pub struct StripeConfig {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct FulfillmentConfig {
-    pub shared_secret: Option<String>    // Secret key loaded directly from env var: FULFIL_SHARED_SECRET
+    pub shared_secret: Option<String>, // Secret key loaded directly from env var: FULFIL_SHARED_SECRET
 }
 
 // --- Payrexx Config ---
@@ -104,9 +104,9 @@ pub struct GcalConfig {
     // pub api_key: String, // Mandatory
     // pub key_path: Option<String>,
     // pub calendar_id: String, // Mandatory
-    pub key_path: Option<String>, // Mandatory
-    pub calendar_id: Option<String>, // Mandatory
-    pub time_slot_duration: Option<u16>, // In minutes                                  
+    pub key_path: Option<String>,        // Mandatory
+    pub calendar_id: Option<String>,     // Mandatory
+    pub time_slot_duration: Option<u16>, // In minutes
 }
 
 #[cfg_attr(feature = "openapi", derive(ToSchema))]
@@ -120,7 +120,9 @@ pub struct AdhocSessionSettings {
     pub preparation_time_minutes: i64,
 }
 
-fn default_adhoc_preparation_time() -> i64 { 15 } // Default 15 minutes preparation
+fn default_adhoc_preparation_time() -> i64 {
+    15
+} // Default 15 minutes preparation
 
 // --- Unified App Configuration ---
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

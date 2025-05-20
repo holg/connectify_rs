@@ -1,23 +1,26 @@
 // --- File: crates/connectify_payrexx/src/handlers.rs ---
-use tracing::info;
 use axum::{
-    extract::{Query, State}, // Added Query
-    response::{Html, IntoResponse, Json, Response}, // Added Html, Response
-    http::{StatusCode, HeaderMap},
     body::Bytes,
+    extract::{Query, State}, // Added Query
+    http::{HeaderMap, StatusCode},
+    response::{Html, IntoResponse, Json, Response}, // Added Html, Response
 };
+use connectify_config::AppConfig;
 use std::sync::Arc;
-use connectify_config::AppConfig; // Use the unified config from the config crate
-// Import logic functions and types
+use tracing::info; // Use the unified config from the config crate
+                   // Import logic functions and types
 use crate::logic::{
-    create_gateway_request, CreateGatewayRequest, CreateGatewayResponse, PayrexxError,
+    create_gateway_request,
+    CreateGatewayRequest,
+    CreateGatewayResponse,
+    PayrexxError,
     // PayrexxWebhookPayload, verify_payrexx_signature, process_webhook
 };
 // Import serde::Deserialize for query params
 use serde::Deserialize;
 
 #[cfg(feature = "openapi")]
-use utoipa::{ToSchema};
+use utoipa::ToSchema;
 
 // --- State ---
 // Contains only the AppConfig Arc, as the HTTP client is static in logic.rs
@@ -45,15 +48,16 @@ pub async fn create_gateway_handler(
     State(state): State<Arc<PayrexxState>>,
     Json(payload): Json<CreateGatewayRequest>,
 ) -> Result<Json<CreateGatewayResponse>, (StatusCode, String)> {
-
     // Check the runtime flag from the shared config inside PayrexxState
     if !state.config.use_payrexx {
-        return Err((StatusCode::SERVICE_UNAVAILABLE, "Payrexx service is disabled.".to_string()));
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Payrexx service is disabled.".to_string(),
+        ));
     }
 
     // Extract the specific Payrexx config from the shared AppConfig
     if let Some(payrexx_config) = state.config.payrexx.as_ref() {
-
         // Call the logic function from logic.rs
         // It uses its own static client now
         match create_gateway_request(payrexx_config, payload).await {
@@ -61,44 +65,64 @@ pub async fn create_gateway_handler(
             Err(PayrexxError::ConfigError) => {
                 // Log potentially sensitive config errors internally only
                 info!("Payrexx configuration error during gateway creation.");
-                Err((StatusCode::INTERNAL_SERVER_ERROR, "Server configuration error.".to_string()))
+                Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Server configuration error.".to_string(),
+                ))
             }
             Err(PayrexxError::RequestError(e)) => {
                 info!("Payrexx Reqwest Error: {}", e);
-                Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to communicate with payment provider.".to_string()))
+                Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to communicate with payment provider.".to_string(),
+                ))
             }
             Err(PayrexxError::ParseError(e)) => {
                 info!("Payrexx Parse Error: {}", e);
-                Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to understand payment provider response.".to_string()))
+                Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to understand payment provider response.".to_string(),
+                ))
             }
             Err(PayrexxError::ApiError { status, message }) => {
                 // Log the actual error from Payrexx
                 info!("Payrexx API Error ({}): {}", status, message);
                 // Return a generic error to the client
-                Err((StatusCode::BAD_GATEWAY, "Payment provider error.".to_string()))
+                Err((
+                    StatusCode::BAD_GATEWAY,
+                    "Payment provider error.".to_string(),
+                ))
             }
             Err(PayrexxError::EncodingError(msg)) => {
                 info!("Payrexx Encoding Error: {}", msg);
-                Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to prepare payment request.".to_string()))
+                Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to prepare payment request.".to_string(),
+                ))
             }
             Err(PayrexxError::InternalError(msg)) => {
                 info!("Payrexx Internal Logic Error: {}", msg);
                 Err((StatusCode::INTERNAL_SERVER_ERROR, msg)) // Or a more generic message
             }
             // Webhook errors cannot originate from create_gateway_request
-            Err(PayrexxError::WebhookSignatureError) | Err(PayrexxError::WebhookProcessingError(_)) => {
+            Err(PayrexxError::WebhookSignatureError)
+            | Err(PayrexxError::WebhookProcessingError(_)) => {
                 // This case should be unreachable
                 info!("Unexpected webhook error during gateway creation!");
-                Err((StatusCode::INTERNAL_SERVER_ERROR, "Unexpected server error.".to_string()))
+                Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Unexpected server error.".to_string(),
+                ))
             }
         }
-
     } else {
         // This case means use_payrexx was true, but config loading failed earlier
-        Err((StatusCode::INTERNAL_SERVER_ERROR, "Payrexx configuration error (details missing).".to_string()))
+        Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Payrexx configuration error (details missing).".to_string(),
+        ))
     }
 }
-
 
 /// Axum handler for incoming Payrexx webhooks (Server-to-Server).
 #[axum::debug_handler]
@@ -118,7 +142,6 @@ pub async fn payrexx_webhook_handler(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-
     if !state.config.use_payrexx {
         return (StatusCode::SERVICE_UNAVAILABLE, "Payrexx service disabled.").into_response();
     }
@@ -132,7 +155,9 @@ pub async fn payrexx_webhook_handler(
         }
     };
     // Adjust header name if needed based on Payrexx documentation
-    let signature_header = headers.get("Webhook-Signature").and_then(|hv| hv.to_str().ok());
+    let signature_header = headers
+        .get("Webhook-Signature")
+        .and_then(|hv| hv.to_str().ok());
 
     // Call the verification logic function
     if let Err(e) = crate::logic::verify_payrexx_signature(&api_secret, &body, signature_header) {
@@ -142,7 +167,11 @@ pub async fn payrexx_webhook_handler(
             return (StatusCode::BAD_REQUEST, "Invalid signature".to_string()).into_response();
         } else {
             // Handle other potential errors from verify_payrexx_signature if any
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Error during signature check".to_string()).into_response();
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error during signature check".to_string(),
+            )
+                .into_response();
         }
     }
     info!("✅ Payrexx webhook signature verified.");
@@ -153,12 +182,17 @@ pub async fn payrexx_webhook_handler(
         Ok(p) => p,
         Err(e) => {
             info!("Failed to deserialize Payrexx webhook payload: {}", e);
-            return (StatusCode::BAD_REQUEST, "Invalid payload format".to_string()).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                "Invalid payload format".to_string(),
+            )
+                .into_response();
         }
     };
 
     // Call the processing logic
-    match crate::logic::process_webhook(payload.clone()).await { // Pass DB pool etc. if needed
+    match crate::logic::process_webhook(payload.clone()).await {
+        // Pass DB pool etc. if needed
         Ok(()) => {
             // Acknowledge receipt to Payrexx with 200 OK
             info!("Webhook processed successfully.:{:?}", payload.clone()); // Debug
@@ -171,12 +205,20 @@ pub async fn payrexx_webhook_handler(
                 PayrexxError::WebhookProcessingError(msg) => {
                     // Specific internal error during processing
                     info!("Webhook Processing Error: {}", msg);
-                    (StatusCode::INTERNAL_SERVER_ERROR, "Webhook processing failed".to_string()).into_response()
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Webhook processing failed".to_string(),
+                    )
+                        .into_response()
                 }
                 // Handle other potential errors returned by process_webhook if necessary
                 _ => {
                     // Generic internal server error for other unexpected errors
-                    (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string()).into_response()
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Internal server error".to_string(),
+                    )
+                        .into_response()
                 }
             }
         }
@@ -209,7 +251,7 @@ pub struct RedirectQuery {
     tag = "Payrexx Redirects"
 ))]
 pub async fn payrexx_success_handler(
-    Query(params): Query<RedirectQuery> // Extract query params
+    Query(params): Query<RedirectQuery>, // Extract query params
 ) -> Html<&'static str> {
     info!("User redirected to success URL. Params: {:?}", params);
     // TODO: Enhance this page - maybe show order details based on params?
@@ -225,9 +267,7 @@ pub async fn payrexx_success_handler(
     responses( (status = 200, description = "Failure page shown to user after payment", content_type = "text/html") ),
     tag = "Payrexx Redirects"
 ))]
-pub async fn payrexx_failure_handler(
-    Query(params): Query<RedirectQuery>
-) -> Html<&'static str> {
+pub async fn payrexx_failure_handler(Query(params): Query<RedirectQuery>) -> Html<&'static str> {
     info!("User redirected to failure URL. Params: {:?}", params);
     // TODO: Enhance this page
     Html("<h1>Payment Failed</h1><p>Unfortunately, your payment could not be processed. Please try again or contact support.</p><a href='/'>Back to Home</a>")
@@ -242,11 +282,8 @@ pub async fn payrexx_failure_handler(
     responses( (status = 200, description = "Cancellation page shown to user", content_type = "text/html") ),
     tag = "Payrexx Redirects"
 ))]
-pub async fn payrexx_cancel_handler(
-    Query(params): Query<RedirectQuery>
-) -> Html<&'static str> {
+pub async fn payrexx_cancel_handler(Query(params): Query<RedirectQuery>) -> Html<&'static str> {
     info!("User redirected to cancel URL. Params: {:?}", params);
     // TODO: Enhance this page
     Html("<h1>Payment Cancelled</h1><p>You have cancelled the payment process.</p><a href='/'>Home</a>")
 }
-

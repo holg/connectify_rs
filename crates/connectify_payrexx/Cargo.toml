@@ -28,12 +28,12 @@ thiserror = { workspace = true }
 connectify-config = { path = "../connectify_config" }
 connectify-common = { path = "../connectify_common" }
 tracing = { workspace = true }
-reqwest = {workspace = true}
-once_cell = {workspace = true}
-hmac = {workspace = true}
-sha2 = {workspace = true}
-base64 = {workspace = true}
-serde_urlencoded = {workspace = true}
+reqwest = { workspace = true }
+once_cell = { workspace = true }
+hmac = { workspace = true }
+sha2 = { workspace = true }
+base64 = { workspace = true }
+serde_urlencoded = { workspace = true }
 # --- Crate Specific External Deps (if any) ---
 # None needed specifically for this basic Payrexx logic yet
 

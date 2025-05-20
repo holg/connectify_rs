@@ -1,11 +1,11 @@
 // --- File: crates/connectify_payrexx/src/logic.rs ---
 #![allow(dead_code)] // Allow dead code for doc functions as long as they are not used, bcs of WIP
-use tracing::info;
 use chrono::Utc;
 use connectify_config::PayrexxConfig; // Use config types from connectify_config
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
-use thiserror::Error; // Use BTreeMap for ordered params for signing
+use thiserror::Error;
+use tracing::info; // Use BTreeMap for ordered params for signing
 
 // Signature generation imports
 use base64::{engine::general_purpose::STANDARD as base64_engine, Engine as _};

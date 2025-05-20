@@ -1,8 +1,8 @@
-use std::{env, fs};
-use std::path::Path;
 use connectify_config_static::load_config;
 use serde_json::Value;
-use tracing::{info};
+use std::path::Path;
+use std::{env, fs};
+use tracing::info;
 
 fn main() {
     let out_dir = env::var("OUT_DIR").expect("Failed to get OUT_DIR environment variable");
@@ -50,9 +50,9 @@ fn main() {
     });
 
     // Add the JSON string as a static constant
-    output.push_str(
-        &format!(r##"pub static DEFAULT_CONFIG_JSON: &str = r#"{json}"#; "##),
-    );
+    output.push_str(&format!(
+        r##"pub static DEFAULT_CONFIG_JSON: &str = r#"{json}"#; "##
+    ));
 
     // Write the generated code to a file
     let dest = Path::new(&out_dir).join("generated_config.rs");

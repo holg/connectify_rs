@@ -49,12 +49,14 @@ pub fn init_with_level(level: Level) {
     // Initialize the subscriber with the filter
     // Use try_init to handle the case where a global default subscriber has already been set
     let result = tracing_subscriber::registry()
-        .with(fmt::layer()
-            .with_target(true)
-            .with_file(true)
-            .with_line_number(true)
-            .with_thread_ids(true)
-            .with_thread_names(true))
+        .with(
+            fmt::layer()
+                .with_target(true)
+                .with_file(true)
+                .with_line_number(true)
+                .with_thread_ids(true)
+                .with_thread_names(true),
+        )
         .with(filter)
         .try_init();
 
