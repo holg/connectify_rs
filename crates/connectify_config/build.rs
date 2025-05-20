@@ -63,8 +63,9 @@ fn main() {
     });
 
     // Tell Cargo to rerun this build script if the environment or config files change
-    info!("cargo:rerun-if-env-changed=RUN_ENV");
-    info!("cargo:rerun-if-changed=config/");
+    println!("cargo:rerun-if-env-changed=RUN_ENV");
+    println!("cargo:rerun-if-changed=config/");
+    println!("cargo:rerun-if-changed=../connectify_config_static/");
 }
 
 fn flatten_json(prefix: &str, val: &Value, output: &mut String) {
