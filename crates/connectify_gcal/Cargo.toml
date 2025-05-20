@@ -28,7 +28,17 @@ serde = { workspace = true }
 chrono = { workspace = true }
 serde_json = { workspace = true }
 connectify-config = { path = "../connectify_config" }
+connectify-common = { path = "../connectify_common" }
+async-trait = "0.1.77"
+uuid = { version = "1.7.0", features = ["v4"] }
 utoipa = { workspace = true, optional = true }
 utoipa-swagger-ui = { workspace = true, optional = true }
 [dev-dependencies]
 mockall = "0.13.1"
+tokio = { version = "1.36.0", features = ["full", "test-util", "macros"] }
+proptest = "1.4.0"
+criterion = { version = "0.5.1", features = ["async_tokio"] }
+
+[[bench]]
+name = "calculate_available_slots_benchmark"
+harness = false

@@ -25,6 +25,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 connectify-config = { path = "../connectify_config" }
+connectify-common = { path = "../connectify_common" }
 tracing = { workspace = true }
 reqwest = { workspace = true } # For making API calls
 once_cell = { workspace = true } # For static HTTP client

@@ -1,77 +1,71 @@
 // --- File: crates/connectify_fulfillment/src/routes.rs ---
 
 use axum::{
-    body::Body as AxumBody,
-    middleware,
-    routing::post, // Assuming fulfillment tasks are triggered by POST
+    routing::post,
     Router,
+    middleware,
 };
 use std::sync::Arc;
-// Import the AppConfig from the config crate, as it will be part of the state
 use connectify_config::AppConfig;
-// Import the specific state struct for fulfillment handlers
 use crate::handlers::FulfillmentState;
 use crate::auth::{fulfillment_auth_middleware, FulfillmentAuthState};
+
+// Conditionally import handlers based on features enabled for this crate
 #[cfg(feature = "gcal")]
-use crate::handlers::{handle_gcal_booking_fulfillment, GcalState};
+use crate::handlers::{handle_gcal_booking_fulfillment, handle_adhoc_gcal_twilio_fulfillment};
+// #[cfg(feature = "twilio")]
+// use crate::handlers::handle_twilio_fulfillment; // Example for another feature
 
 /// Creates a router containing all routes for the fulfillment service.
-/// Initializes and applies the necessary FulfillmentState.
-///
-/// # Arguments
-/// * `config`: The shared application configuration (`Arc<AppConfig>`).
-/// * `gcal_state_option`: An Option containing the GcalState if GCal is enabled.
-///                        This is needed if fulfillment directly interacts with GCal.
-/// * `twilio_config_option`: An Option containing TwilioConfig if Twilio is enabled.
-///                           This is needed if fulfillment directly interacts with Twilio.
-///
-/// # Returns
-/// An Axum Router configured with fulfillment routes and state.
 pub fn routes(
     config: Arc<AppConfig>,
-    #[cfg(feature = "gcal")] gcal_state_option: Option<Arc<GcalState>>,
-    // Pass other necessary states if fulfillment logic needs them directly
-    // For example, if GCal booking happens here, we need GcalState
+    #[cfg(feature = "gcal")]
+    gcal_state_option: Option<Arc<connectify_gcal::handlers::GcalState>>,
 ) -> Router {
-    // Return concrete Router, state applied internally
-    // Create the state for the fulfillment handlers
+
     let handler_state = Arc::new(FulfillmentState {
-        config: config.clone(), // Clone Arc for handler state
+        config: config.clone(),
         #[cfg(feature = "gcal")]
-        gcal_state: gcal_state_option.clone(), // Store the GcalState if provided for handlers
+        gcal_state_for_fulfillment: gcal_state_option,
     });
-    // Create the specific state needed for Fulfillment handlers
-    // This state will hold what the fulfillment logic needs,
-    // which might include parts of AppConfig or other feature states.
-    #[allow(unused_variables)]
-    let fulfillment_state = Arc::new(FulfillmentState {
-        config: config.clone(), // The main AppConfig
-        #[cfg(feature = "gcal")]
-        gcal_state: gcal_state_option, // Store the GcalState if provided
-                // Add other states as needed, e.g., for Twilio
-    });
-    // Create the state for the authentication middleware
+
     let auth_middleware_state = Arc::new(FulfillmentAuthState {
-        config: config.clone(), // Clone Arc for auth middleware state
+        config: config.clone(),
     });
-    // Define the core fulfillment API routes
+
     let mut fulfillment_api_router = Router::new();
 
+    // Conditionally add the GCal fulfillment routes
     #[cfg(feature = "gcal")]
     {
-
-        // Ensure the main config also enables gcal for runtime check
-        if config.use_gcal && config.gcal.is_some() {
-            println!("💡 Fulfillment: GCal feature is enabled, adding /fulfill/gcal-booking route.");
+        // Check runtime config flags before adding routes
+        if config.use_gcal && config.gcal.is_some() { // For standard GCal booking
+            println!("💡 Fulfillment: Adding /fulfill/gcal-booking route.");
             fulfillment_api_router = fulfillment_api_router.route(
                 "/fulfill/gcal-booking",
                 post(handle_gcal_booking_fulfillment)
             );
         }
+        // For adhoc GCal booking (which also relies on GCal config and use_adhoc_sessions flag)
+        if config.use_adhoc && config.adhoc_settings.as_ref().map_or(false, |s| s.admin_enabled) && config.gcal.is_some() {
+            println!("💡 Fulfillment: Adding /fulfill/adhoc-gcal-twilio route.");
+            fulfillment_api_router = fulfillment_api_router.route(
+                "/fulfill/adhoc-gcal-twilio", // New route for adhoc
+                post(handle_adhoc_gcal_twilio_fulfillment)
+            );
+        }
     }
-    // Apply the authentication middleware to all routes in fulfillment_api_router,
-    // then apply the state for the handlers themselves.
+
+    // TODO: Add other fulfillment routes here (e.g., for Twilio specific fulfillment)
+    // #[cfg(feature = "twilio")]
+    // {
+    //     if config.use_twilio && config.twilio.is_some() {
+    //         // router = router.route("/fulfill/twilio-something", post(handle_twilio_something_fulfillment));
+    //     }
+    // }
+
     fulfillment_api_router
-        .layer(middleware::from_fn_with_state(auth_middleware_state, fulfillment_auth_middleware::<AxumBody>))
+        .layer(middleware::from_fn_with_state(auth_middleware_state, fulfillment_auth_middleware::<axum::body::Body>))
         .with_state(handler_state)
+
 }

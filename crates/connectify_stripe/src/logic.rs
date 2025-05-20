@@ -1,8 +1,6 @@
 // --- File: crates/connectify_stripe/src/logic.rs ---
-use connectify_config::{AppConfig, StripeConfig, PriceTier};
+use connectify_config::{AppConfig, StripeConfig}; //, PriceTier};
 use hmac::{Hmac, Mac};
-use once_cell::sync::Lazy;
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 #[allow(unused_imports)]
@@ -13,45 +11,18 @@ use std::{
     collections::HashMap,
     env,
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH, Duration},
+    time::{SystemTime, UNIX_EPOCH},
 };
-use thiserror::Error;
+
+// Import the StripeError from the error module
+use crate::error::StripeError;
+
+// Import the HTTP client from connectify_common
+use connectify_common::HTTP_CLIENT;
 
 // Conditionally import ToSchema if openapi feature is enabled
 #[cfg(feature = "openapi")]
 use utoipa::ToSchema;
-
-// --- Error Handling ---
-#[derive(Error, Debug)]
-pub enum StripeError {
-    #[error("Stripe API request failed: {0}")]
-    RequestError(#[from] reqwest::Error),
-    #[error("Stripe API returned an error: {message} (Status: {status_code})")]
-    ApiError { status_code: u16, message: String },
-    #[error("Failed to parse Stripe API response: {0}")]
-    ParseError(#[from] serde_json::Error),
-    #[error("Stripe configuration missing or incomplete")]
-    ConfigError,
-    #[error("Stripe webhook signature verification failed: {0}")] // For webhook errors
-    WebhookSignatureError(String),
-    #[error("Stripe webhook event processing error: {0}")] // For webhook errors
-    WebhookProcessingError(String),
-    #[error("Fulfillment service call failed: {0}")]
-    FulfillmentError(String),
-    #[error("Missing fulfillment data in webhook metadata")]
-    MissingFulfillmentData,
-    #[error("Session not found or not paid")]
-    SessionNotFoundOrNotPaid,
-    #[error("Invalid fulfillment data for pricing: {0}")] // For pricing errors
-    InvalidFulfillmentDataForPricing(String),
-    #[error("No matching price tier found for duration: {0} minutes")] // For pricing errors
-    NoMatchingPriceTier(i64),
-    #[error("Internal processing error: {0}")]
-    InternalError(String),
-}
-
-// --- Static HTTP Client ---
-static HTTP_CLIENT: Lazy<Client> = Lazy::new(Client::new);
 
 // --- Data Structures ---
 
@@ -83,6 +54,7 @@ pub struct CreateCheckoutSessionRequest {
     #[cfg_attr(feature = "openapi", schema(example = "my_internal_order_123"))]
     pub client_reference_id: Option<String>,
 }
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct StripeCheckoutSessionResponse {
     pub id: String,
@@ -346,6 +318,8 @@ pub async fn process_stripe_webhook(
                         let fulfillment_endpoint_path = match ff_type.as_str() {
                             "gcal_booking" => "/api/fulfill/gcal-booking",
                             // "twilio_session" => "/api/fulfill/twilio-session", // Example
+                            "adhoc_gcal_twilio" => "/api/fulfill/adhoc-gcal-twilio",
+                            // "twilio_session" => "/api/fulfill/twilio-session", // Example
                             _ => {
                                 eprintln!(
                                     "[Stripe Webhook] Unknown fulfillment_type in metadata: {}",
@@ -437,15 +411,15 @@ pub async fn create_checkout_session(
     let stripe_secret_key = env::var("STRIPE_SECRET_KEY").map_err(|_| StripeError::ConfigError)?;
 
     // --- Determine Price and Product Name based on fulfillment_data and price_tiers ---
-    let mut unit_amount: i64;
-    let mut product_name: String;
-    let mut currency: String;
+    let unit_amount: i64;
+    let product_name: String;
+    let currency: String;
 
-    if request_data.fulfillment_type == "gcal_booking" {
+    if request_data.fulfillment_type == "gcal_booking" || request_data.fulfillment_type == "adhoc_gcal_twilio" {
         let start_time_str = request_data.fulfillment_data.get("start_time").and_then(|v| v.as_str())
-            .ok_or_else(|| StripeError::InvalidFulfillmentDataForPricing("Missing start_time in fulfillment_data for gcal_booking".to_string()))?;
+            .ok_or_else(|| StripeError::InvalidFulfillmentDataForPricing("Missing start_time in fulfillment_data for GCal-based booking".to_string()))?;
         let end_time_str = request_data.fulfillment_data.get("end_time").and_then(|v| v.as_str())
-            .ok_or_else(|| StripeError::InvalidFulfillmentDataForPricing("Missing end_time in fulfillment_data for gcal_booking".to_string()))?;
+            .ok_or_else(|| StripeError::InvalidFulfillmentDataForPricing("Missing end_time in fulfillment_data for GCal-based booking".to_string()))?;
 
         let start_dt = DateTime::parse_from_rfc3339(start_time_str)
             .map_err(|e| StripeError::InvalidFulfillmentDataForPricing(format!("Invalid start_time format: {}", e)))?.with_timezone(&Utc);
@@ -457,24 +431,25 @@ pub async fn create_checkout_session(
         }
         let duration_minutes = (end_dt - start_dt).num_minutes();
 
-        // Find matching price tier
         let tier = stripe_config.price_tiers.iter()
             .find(|t| t.duration_minutes == duration_minutes)
             .ok_or_else(|| StripeError::NoMatchingPriceTier(duration_minutes))?;
 
         unit_amount = tier.unit_amount;
+        // Use product_name from tier, fallback to summary from fulfillment_data, then a generic default
         product_name = tier.product_name.clone().unwrap_or_else(||
-            request_data.fulfillment_data.get("summary").and_then(|v| v.as_str()).unwrap_or("Booked Service").to_string()
+            request_data.fulfillment_data.get("summary").and_then(|v| v.as_str()).map(String::from)
+                .unwrap_or_else(|| format!("Service - {} min", duration_minutes))
         );
         currency = tier.currency.clone().unwrap_or_else(||
             stripe_config.default_currency.clone().unwrap_or_else(|| "chf".to_string())
         ).to_lowercase();
 
-        println!("[Stripe Logic] Calculated duration: {} mins. Selected tier: amount={}, product='{}', currency='{}'",
-                 duration_minutes, unit_amount, product_name, currency);
+        println!("[Stripe Logic] Type: {}. Duration: {} mins. Tier: amount={}, product='{}', currency='{}'",
+                 request_data.fulfillment_type, duration_minutes, unit_amount, product_name, currency);
 
     } else {
-        // Handle other fulfillment types or default pricing if necessary
+        // Handle other fulfillment types or default pricing if necessary in the future
         return Err(StripeError::InvalidFulfillmentDataForPricing(format!("Unsupported fulfillment_type for dynamic pricing: {}", request_data.fulfillment_type)));
     }
     // --- End Price and Product Name Determination ---
@@ -691,4 +666,3 @@ pub async fn list_checkout_sessions_admin(
         Err(StripeError::ApiError { status_code: status.as_u16(), message: error_message })
     }
 }
-

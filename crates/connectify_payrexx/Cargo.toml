@@ -26,6 +26,7 @@ serde_json = { workspace = true }
 chrono = { workspace = true } # For timestamps if needed
 thiserror = { workspace = true }
 connectify-config = { path = "../connectify_config" }
+connectify-common = { path = "../connectify_common" }
 tracing = { workspace = true }
 reqwest = {workspace = true}
 once_cell = {workspace = true}

@@ -5,4 +5,15 @@ pub mod doc;
 pub mod handlers;
 pub mod logic;
 pub mod routes;
+pub mod service;
 mod test;
+#[cfg(test)]
+mod logic_test;
+#[cfg(test)]
+mod handlers_test;
+#[cfg(test)]
+mod routes_test;
+#[cfg(test)]
+mod auth_test;
+#[cfg(test)]
+mod logic_proptest;

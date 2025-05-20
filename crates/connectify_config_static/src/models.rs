@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 // #[cfg(feature = "openapi")]
 // use utoipa::ToSchema; // , IntoParams};
 // --- General Server Config ---
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", derive(utoipa::{ToSchema}))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ServerConfig {
     pub host: String,
@@ -30,7 +30,7 @@ pub struct TwilioConfig {
     // Secret loaded directly from env var: TWILIO_API_KEY_SECRET
 }
 
-#[cfg_attr(feature = "openapi", derive(ToSchema))]
+#[cfg_attr(feature = "openapi", derive(ToSchema, PartialSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PriceTier {
     /// Duration in minutes for this price tier.
@@ -109,6 +109,19 @@ pub struct GcalConfig {
     pub time_slot_duration: Option<u16>, // In minutes                                  
 }
 
+#[cfg_attr(feature = "openapi", derive(ToSchema))]
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct AdhocSessionSettings {
+    /// Can be set by an admin to quickly enable/disable the adhoc booking feature.
+    #[serde(default)] // Defaults to false if not in config
+    pub admin_enabled: bool,
+    /// Preparation time in minutes required before an adhoc session can start.
+    #[serde(default = "default_adhoc_preparation_time")]
+    pub preparation_time_minutes: i64,
+}
+
+fn default_adhoc_preparation_time() -> i64 { 15 } // Default 15 minutes preparation
+
 // --- Unified App Configuration ---
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -129,6 +142,8 @@ pub struct AppConfig {
     pub use_payrexx: bool,
     #[serde(default)]
     pub use_calendly: bool,
+    #[serde(default)]
+    pub use_adhoc: bool,
 
     // --- Optional Feature Configurations ---
     #[serde(default)]
@@ -143,4 +158,6 @@ pub struct AppConfig {
     pub payrexx: Option<PayrexxConfig>,
     #[serde(default)]
     pub gcal: Option<GcalConfig>,
+    #[serde(default)]
+    pub adhoc_settings: Option<AdhocSessionSettings>,
 }

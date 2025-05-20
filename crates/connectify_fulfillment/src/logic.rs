@@ -39,10 +39,12 @@ pub enum FulfillmentError {
     #[error("Google Calendar booking conflict")]
     GcalBookingConflict,
 
+    #[error("Internal feature disabled: {0}")]
+    FeatureDisabled(String),
     // Add other specific errors for other fulfillment types (e.g., Twilio)
-    // #[cfg(feature = "twilio")]
-    // #[error("Twilio fulfillment error: {0}")]
-    // TwilioError(String),
+    #[cfg(feature = "twilio")]
+    #[error("Twilio fulfillment error: {0}")]
+    TwilioError(String),
 
     #[error("Internal fulfillment error: {0}")]
     InternalError(String),
@@ -82,7 +84,8 @@ pub struct FulfillmentResponse {
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub event_id: Option<String>, // e.g., GCal event ID
-    // Add other relevant details
+    #[serde(skip_serializing_if = "Option::is_none")] // Added for adhoc
+    pub room_name: Option<String>,
 }
 
 
@@ -130,6 +133,7 @@ pub async fn fulfill_gcal_booking_logic(
                 success: true,
                 message: "Google Calendar event booked successfully.".to_string(),
                 event_id,
+                room_name: None,
             })
         }
         Err(GcalError::Conflict) => {
@@ -143,6 +147,71 @@ pub async fn fulfill_gcal_booking_logic(
     }
 }
 
+#[derive(Deserialize, Debug, Clone)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct AdhocGcalTwilioFulfillmentRequest {
+    #[cfg_attr(feature = "openapi", schema(example = "2025-06-10T10:00:00Z"))]
+    pub start_time: String,
+    #[cfg_attr(feature = "openapi", schema(example = "2025-06-10T11:00:00Z"))]
+    pub end_time: String,
+    #[cfg_attr(feature = "openapi", schema(example = "Adhoc Session - Room adhoc-xyz"))]
+    pub summary: String,
+    pub description: Option<String>,
+    #[cfg_attr(feature = "openapi", schema(example = "adhoc-xyz123-abc"))]
+    pub room_name: String,
+    pub original_reference_id: Option<String>,
+}
+
+#[cfg(feature = "gcal")] // This fulfillment type also depends on GCal
+pub async fn fulfill_adhoc_gcal_twilio_logic(
+    gcal_config: &GcalConfig,
+    payload: AdhocGcalTwilioFulfillmentRequest,
+) -> Result<FulfillmentResponse, FulfillmentError> {
+    println!("[Fulfillment Logic] Attempting Adhoc GCal booking for room: {}, summary: {}", payload.room_name, payload.summary);
+
+    let calendar_id_to_use = gcal_config.calendar_id.as_ref().ok_or_else(|| FulfillmentError::ConfigError("Missing GCal calendar_id in config for adhoc booking".to_string()))?;
+
+    let hub = create_calendar_hub(gcal_config).await
+        .map_err(|e| FulfillmentError::GcalApiError(format!("Failed to create GCal client for adhoc: {}", e)))?;
+
+    let gcal_book_request = GcalBookSlotRequest {
+        start_time: payload.start_time,
+        end_time: payload.end_time,
+        summary: payload.summary.clone(),
+        description: payload.description,
+    };
+
+    match gcal_create_event(&hub, calendar_id_to_use, gcal_book_request).await {
+        Ok(created_event) => {
+            let event_id = created_event.id;
+            println!("[Fulfillment Logic] Successfully booked Adhoc GCal event. ID: {:?}, Room: {}", event_id, payload.room_name);
+            Ok(FulfillmentResponse {
+                success: true,
+                message: "Adhoc Google Calendar event booked successfully.".to_string(),
+                event_id,
+                room_name: Some(payload.room_name),
+            })
+        }
+        Err(GcalError::Conflict) => {
+            eprintln!("[Fulfillment Logic] Adhoc GCal booking conflict for summary: {}", payload.summary);
+            Err(FulfillmentError::GcalBookingConflict)
+        }
+        Err(e) => {
+            eprintln!("[Fulfillment Logic] Error booking Adhoc GCal event: {}", e);
+            Err(FulfillmentError::GcalApiError(e.to_string()))
+        }
+    }
+}
+
+#[cfg(not(feature = "gcal"))]
+pub async fn fulfill_adhoc_gcal_twilio_logic(
+    _gcal_config: &GcalConfig,
+    _payload: AdhocGcalTwilioFulfillmentRequest,
+) -> Result<FulfillmentResponse, FulfillmentError> {
+    eprintln!("[Fulfillment Logic] GCal feature not enabled. Cannot fulfill Adhoc GCal booking.");
+    Err(FulfillmentError::FeatureDisabled("GCal feature not enabled".to_string()))
+}
+
+
 // TODO: Implement logic for other fulfillment tasks
 // pub async fn fulfill_twilio_adhoc_session_logic(...) -> Result<FulfillmentResponse, FulfillmentError> { ... }
-

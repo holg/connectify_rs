@@ -4,33 +4,64 @@ use connectify_config_static::load_config;
 use serde_json::Value;
 
 fn main() {
-    let config = load_config().expect("Failed to load config");
-    let json = serde_json::to_value(config).expect("Failed to serialize config to Value");
-
-    let mut output = String::new();
-    flatten_json("", &json, &mut output);
-
-    let out_dir = env::var("OUT_DIR").unwrap();
-    let dest = Path::new(&out_dir).join("generated_constants.rs");
+    let out_dir = env::var("OUT_DIR").expect("Failed to get OUT_DIR environment variable");
     eprintln!("build.rs: starting config load");
 
+    // Load the configuration with improved error handling
     let config = load_config().unwrap_or_else(|err| {
-        panic!("Failed to load config: {err:?}");
+        eprintln!("Error loading configuration:");
+        eprintln!("  {}", err);
+
+        // Provide more context based on the error
+        let error_message = format!("{:?}", err);
+        if error_message.contains("NotFound") {
+            eprintln!("  Configuration file not found");
+            eprintln!("  Make sure the file exists and is accessible.");
+        } else if error_message.contains("PathParse") {
+            eprintln!("  Invalid configuration path");
+            eprintln!("  Check the path format in your configuration.");
+        } else if error_message.contains("FileParse") {
+            eprintln!("  Failed to parse configuration file");
+            eprintln!("  Check the syntax of your configuration file.");
+        } else {
+            eprintln!("  Check your configuration files and environment variables.");
+        }
+
+        panic!("Failed to load configuration. See error details above.");
     });
 
     eprintln!("build.rs: successfully loaded config");
-    eprintln!("build.rs: successfully loaded config");
-    eprintln!("{:#?}", config);
 
-    let json = serde_json::to_string_pretty(&config).expect("Failed to serialize config");
+    // Convert the configuration to JSON
+    let json = serde_json::to_value(&config).unwrap_or_else(|err| {
+        eprintln!("Failed to serialize configuration to JSON: {}", err);
+        panic!("Failed to serialize configuration to JSON");
+    });
 
-    let dest = Path::new(&out_dir).join("generated_config.rs");
+    // Generate constants from the configuration
+    let mut output = String::new();
+    flatten_json("", &json, &mut output);
 
+    // Convert the configuration to a pretty-printed JSON string
+    let json = serde_json::to_string_pretty(&config).unwrap_or_else(|err| {
+        eprintln!("Failed to serialize configuration to pretty JSON: {}", err);
+        panic!("Failed to serialize configuration to pretty JSON");
+    });
+
+    // Add the JSON string as a static constant
     output.push_str(
         &format!(r##"pub static DEFAULT_CONFIG_JSON: &str = r#"{json}"#; "##),
     );
-    fs::write(dest, output).expect("Failed to write generated_constants.rs");
 
+    // Write the generated code to a file
+    let dest = Path::new(&out_dir).join("generated_config.rs");
+    fs::write(&dest, output).unwrap_or_else(|err| {
+        eprintln!("Failed to write generated configuration file: {}", err);
+        eprintln!("  Destination: {}", dest.display());
+        panic!("Failed to write generated configuration file");
+    });
+
+    // Tell Cargo to rerun this build script if the environment or config files change
     println!("cargo:rerun-if-env-changed=RUN_ENV");
     println!("cargo:rerun-if-changed=config/");
 }

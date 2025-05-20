@@ -11,6 +11,7 @@ members = [
     "crates/connectify_payrexx",
     "crates/connectify_stripe",
     "crates/connectify_fulfillment",
+    "crates/connectify_adhoc",
 ]
 resolver = "2"  # required for clean feature resolution across crates
 

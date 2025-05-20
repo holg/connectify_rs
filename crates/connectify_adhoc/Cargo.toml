@@ -1,0 +1,32 @@
+# --- File: crates/connectify_adhoc/Cargo.toml ---
+[package]
+name = "connectify-adhoc"
+version = "0.1.0"
+edition = "2021"
+authors = ["Holger Trahe <trahe@mac.com>"]
+description = "Handles adhoc session initiation for Connectify"
+
+[features]
+default = []
+openapi = ["dep:utoipa", "utoipa/axum_extras"]
+# These features indicate this crate *uses* the logic from gcal and stripe crates
+gcal = ["connectify-gcal"]
+stripe = ["connectify-stripe"]
+
+[dependencies]
+axum = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+connectify-config = { path = "../connectify_config" }
+connectify-common = { path = "../connectify_common" }
+tracing = { workspace = true }
+uuid = { version = "1", features = ["v4"] } # For unique room names
+
+# Dependencies on other workspace crates for their logic
+connectify-gcal = { path = "../connectify_gcal", optional = true }
+connectify-stripe = { path = "../connectify_stripe", optional = true }
+
+utoipa = { workspace = true, optional = true }

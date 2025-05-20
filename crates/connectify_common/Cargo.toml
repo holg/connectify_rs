@@ -8,7 +8,22 @@ openapi = [
     "dep:utoipa",
     "dep:utoipa-swagger-ui",
 ]
+gcal = []
+stripe = []
+twilio = []
+payrexx = []
+fulfillment = []
+adhoc = []
 [dependencies]
 serde = { workspace = true }
 utoipa = { workspace = true, optional = true }
 utoipa-swagger-ui = { workspace = true, optional = true }
+axum = { workspace = true }
+thiserror = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+once_cell = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+connectify-config = { path = "../connectify_config" }

@@ -1,0 +1,247 @@
+// --- File: crates/connectify_common/src/services.rs ---
+//! Service abstractions for external services.
+//!
+//! This module provides trait definitions for external services used by the application.
+//! These traits allow for dependency injection and easier testing by decoupling the
+//! application logic from specific implementations of external services.
+
+use std::sync::Arc;
+use chrono::{DateTime, Utc};
+use serde::{Serialize, Deserialize};
+use std::fmt;
+use std::error::Error as StdError;
+
+/// A wrapper error type that implements std::error::Error for Box<dyn std::error::Error + Send + Sync>
+#[derive(Debug)]
+pub struct BoxedError(pub Box<dyn StdError + Send + Sync>);
+
+impl fmt::Display for BoxedError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl StdError for BoxedError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        self.0.source()
+    }
+}
+
+impl From<Box<dyn StdError + Send + Sync>> for BoxedError {
+    fn from(err: Box<dyn StdError + Send + Sync>) -> Self {
+        BoxedError(err)
+    }
+}
+
+/// A trait for calendar service operations.
+///
+/// This trait defines the operations that can be performed on a calendar service,
+/// such as checking availability, booking slots, and managing events.
+pub trait CalendarService: Send + Sync {
+    /// Error type returned by calendar service operations.
+    type Error: std::error::Error + Send + Sync + 'static;
+
+    /// Get busy time intervals within a specified time range.
+    fn get_busy_times(
+        &self,
+        calendar_id: &str,
+        start_time: DateTime<Utc>,
+        end_time: DateTime<Utc>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<(DateTime<Utc>, DateTime<Utc>)>, Self::Error>> + Send + '_>>;
+
+    /// Create a calendar event.
+    fn create_event(
+        &self,
+        calendar_id: &str,
+        event: CalendarEvent,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<CalendarEventResult, Self::Error>> + Send + '_>>;
+
+    /// Delete a calendar event.
+    fn delete_event(
+        &self,
+        calendar_id: &str,
+        event_id: &str,
+        notify_attendees: bool,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Self::Error>> + Send + '_>>;
+
+    /// Mark a calendar event as cancelled.
+    fn mark_event_cancelled(
+        &self,
+        calendar_id: &str,
+        event_id: &str,
+        notify_attendees: bool,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<CalendarEventResult, Self::Error>> + Send + '_>>;
+
+    /// Get booked events within a specified time range.
+    fn get_booked_events(
+        &self,
+        calendar_id: &str,
+        start_time: DateTime<Utc>,
+        end_time: DateTime<Utc>,
+        include_cancelled: bool,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<BookedEvent>, Self::Error>> + Send + '_>>;
+}
+
+/// A trait for payment service operations.
+///
+/// This trait defines the operations that can be performed on a payment service,
+/// such as creating charges, managing subscriptions, and handling refunds.
+pub trait PaymentService: Send + Sync {
+    /// Error type returned by payment service operations.
+    type Error: std::error::Error + Send + Sync + 'static;
+
+    /// Create a payment intent.
+    fn create_payment_intent(
+        &self,
+        amount: i64,
+        currency: &str,
+        description: Option<&str>,
+        metadata: Option<serde_json::Value>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<PaymentIntentResult, Self::Error>> + Send + '_>>;
+
+    /// Confirm a payment intent.
+    fn confirm_payment_intent(
+        &self,
+        payment_intent_id: &str,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<PaymentIntentResult, Self::Error>> + Send + '_>>;
+
+    /// Cancel a payment intent.
+    fn cancel_payment_intent(
+        &self,
+        payment_intent_id: &str,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<PaymentIntentResult, Self::Error>> + Send + '_>>;
+
+    /// Create a refund.
+    fn create_refund(
+        &self,
+        payment_intent_id: &str,
+        amount: Option<i64>,
+        reason: Option<&str>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<RefundResult, Self::Error>> + Send + '_>>;
+}
+
+/// A trait for notification service operations.
+///
+/// This trait defines the operations that can be performed on a notification service,
+/// such as sending emails, SMS, or push notifications.
+pub trait NotificationService: Send + Sync {
+    /// Error type returned by notification service operations.
+    type Error: std::error::Error + Send + Sync + 'static;
+
+    /// Send an email notification.
+    fn send_email(
+        &self,
+        to: &str,
+        subject: &str,
+        body: &str,
+        is_html: bool,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<NotificationResult, Self::Error>> + Send + '_>>;
+
+    /// Send an SMS notification.
+    fn send_sms(
+        &self,
+        to: &str,
+        body: &str,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<NotificationResult, Self::Error>> + Send + '_>>;
+}
+
+/// A factory for creating service instances.
+///
+/// This trait provides methods for creating instances of various services.
+/// It's used by the application to get access to the services it needs.
+pub trait ServiceFactory: Send + Sync {
+    /// Get a calendar service instance.
+    fn calendar_service(&self) -> Option<Arc<dyn CalendarService<Error = BoxedError>>>;
+
+    /// Get a payment service instance.
+    fn payment_service(&self) -> Option<Arc<dyn PaymentService<Error = BoxedError>>>;
+
+    /// Get a notification service instance.
+    fn notification_service(&self) -> Option<Arc<dyn NotificationService<Error = BoxedError>>>;
+}
+
+/// Data structures for calendar service operations.
+
+/// Represents a calendar event to be created.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CalendarEvent {
+    /// The start time of the event.
+    pub start_time: String,
+    /// The end time of the event.
+    pub end_time: String,
+    /// The summary or title of the event.
+    pub summary: String,
+    /// An optional description of the event.
+    pub description: Option<String>,
+}
+
+/// Represents the result of a calendar event operation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CalendarEventResult {
+    /// The ID of the event.
+    pub event_id: Option<String>,
+    /// The status of the event.
+    pub status: String,
+}
+
+/// Represents a booked event.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BookedEvent {
+    /// The ID of the event.
+    pub event_id: String,
+    /// The summary or title of the event.
+    pub summary: String,
+    /// An optional description of the event.
+    pub description: Option<String>,
+    /// The start time of the event.
+    pub start_time: String,
+    /// The end time of the event.
+    pub end_time: String,
+    /// The status of the event.
+    pub status: String,
+    /// When the event was created.
+    pub created: String,
+    /// When the event was last updated.
+    pub updated: String,
+}
+
+/// Data structures for payment service operations.
+
+/// Represents the result of a payment intent operation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaymentIntentResult {
+    /// The ID of the payment intent.
+    pub id: String,
+    /// The status of the payment intent.
+    pub status: String,
+    /// The amount of the payment intent.
+    pub amount: i64,
+    /// The currency of the payment intent.
+    pub currency: String,
+    /// The client secret for the payment intent.
+    pub client_secret: Option<String>,
+}
+
+/// Represents the result of a refund operation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RefundResult {
+    /// The ID of the refund.
+    pub id: String,
+    /// The status of the refund.
+    pub status: String,
+    /// The amount of the refund.
+    pub amount: i64,
+    /// The currency of the refund.
+    pub currency: String,
+}
+
+/// Data structures for notification service operations.
+
+/// Represents the result of a notification operation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NotificationResult {
+    /// The ID of the notification.
+    pub id: String,
+    /// The status of the notification.
+    pub status: String,
+}

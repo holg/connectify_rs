@@ -20,6 +20,10 @@ gcal = [
 twilio = [
     "dep:connectify-twilio",
 ]
+
+adhoc = [
+    "dep:connectify-adhoc",
+]
 [dependencies]
 # --- Workspace Deps ---
 axum = { workspace = true }
@@ -36,6 +40,7 @@ tracing = { workspace = true }
 # These should be optional if the fulfillment actions are conditional
 connectify-gcal = { path = "../connectify_gcal", optional = true }
 connectify-twilio = {path = "../connectify_twilio", optional = true }
+connectify-adhoc = {path = "../connectify_adhoc", optional = true }
 # connectify-storage = { workspace = true, optional = true } # If it needs direct DB access
 
 # --- Crate Specific External Deps ---

@@ -5,6 +5,8 @@ use_twilio: true
 use_stripe: true
 use_payrexx: true
 use_fulfillment: true
+use_gcal: true
+use_adhoc_session: true
 
 database:
   url: sqlite://example.db
@@ -59,3 +61,7 @@ calendly:
 
 fulfillment:
   FULFILLMENT_SHARED_SECRET: "secret_from_env"
+
+adhoc_settings:
+  admin_enabled: true
+  preparation_time_minutes: 120

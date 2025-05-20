@@ -1,14 +1,26 @@
 // --- File: crates/connectify_stripe/src/handlers.rs ---
+// use crate::error::StripeError;
 use crate::logic::{
     create_checkout_session, get_checkout_session_details, list_checkout_sessions_admin,
     process_stripe_webhook, verify_stripe_signature, CreateCheckoutSessionRequest,
     CreateCheckoutSessionResponse, ListSessionsAdminQuery, ListSessionsAdminResponse,
-    StripeCheckoutSessionData, StripeError, StripeEvent,
+    StripeCheckoutSessionData, StripeEvent,
 };
 use axum::{
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Json, Redirect, Response},
+};
+use connectify_common::{
+    config_error,
+    // external_service_error,
+    // validation_error,
+    // not_found,
+    // IntoHttpResponse,
+    // handle_json_result,
+    // map_error,
+    map_json_error,
+    ConnectifyError,
 };
 use connectify_config::AppConfig;
 use connectify_config::StripeConfig;
@@ -40,97 +52,21 @@ pub struct StripeState {
 pub async fn create_checkout_session_handler(
     State(state): State<Arc<StripeState>>,
     Json(payload): Json<CreateCheckoutSessionRequest>,
-) -> Result<Json<CreateCheckoutSessionResponse>, (StatusCode, String)> {
+) -> Result<Json<CreateCheckoutSessionResponse>, Response> {
     if !state.config.use_stripe {
-        return Err((
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Stripe service is disabled.".to_string(),
-        ));
+        return Err(
+            ConnectifyError::ConfigError("Stripe service is disabled".to_string()).into_response(),
+        );
     }
 
     if let Some(stripe_config) = state.config.stripe.as_ref() {
-        match create_checkout_session(stripe_config, payload).await {
-            Ok(response) => Ok(Json(response)),
-            Err(StripeError::ConfigError) => {
-                eprintln!("Stripe configuration error.");
-                Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Stripe configuration error on server.".to_string(),
-                ))
-            }
-            Err(StripeError::RequestError(e)) => {
-                eprintln!("Stripe Reqwest Error: {}", e);
-                Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to communicate with payment provider.".to_string(),
-                ))
-            }
-            Err(StripeError::ParseError(e)) => {
-                eprintln!("Stripe Parse Error: {}", e);
-                Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to understand payment provider response.".to_string(),
-                ))
-            }
-            Err(StripeError::ApiError {
-                status_code,
-                message,
-            }) => {
-                eprintln!("Stripe API Error ({}): {}", status_code, message);
-                Err((
-                    StatusCode::from_u16(status_code).unwrap_or(StatusCode::BAD_GATEWAY),
-                    message,
-                ))
-            }
-            // These errors are for webhook handling, not checkout session creation
-            Err(StripeError::WebhookSignatureError(_))
-            | Err(StripeError::WebhookProcessingError(_)) => {
-                eprintln!("Unexpected webhook error during checkout session creation.");
-                Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Unexpected server error".to_string(),
-                ))
-            }
-            Err(StripeError::FulfillmentError(msg)) => {
-                eprintln!(
-                    "Fulfillment error during checkout session creation: {}",
-                    msg
-                );
-                Err((StatusCode::INTERNAL_SERVER_ERROR, msg))
-            }
-            Err(StripeError::MissingFulfillmentData) => {
-                eprintln!("Missing fulfillment data during checkout session creation.");
-                Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Missing fulfillment data".to_string(),
-                ))
-            }
-            Err(StripeError::SessionNotFoundOrNotPaid) => {
-                eprintln!("Session not found or not paid during checkout session creation.");
-                Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Session not found or not paid".to_string(),
-                ))
-            }
-            Err(StripeError::InvalidFulfillmentDataForPricing(msg)) => {
-                eprintln!("Invalid fulfillment data for pricing: {}", msg);
-                Err((StatusCode::INTERNAL_SERVER_ERROR, msg))
-            }
-            Err(StripeError::NoMatchingPriceTier(duration)) => {
-                eprintln!("No matching price tier for duration: {} minutes", duration);
-                Err((StatusCode::BAD_REQUEST, format!("No price tier available for {} minute duration.", duration)))
-            }
-            Err(StripeError::InternalError(msg)) => {
-                eprintln!("Stripe Internal Logic Error: {}", msg);
-                Err((StatusCode::INTERNAL_SERVER_ERROR, msg))
-            }
-
-        }
+        // Use map_json_error to convert StripeError to ConnectifyError and then to a Response
+        map_json_error(
+            create_checkout_session(stripe_config, payload).await,
+            |err| err.into(), // Convert StripeError to ConnectifyError using the From implementation
+        )
     } else {
-        Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Stripe configuration not loaded.".to_string(),
-        ))
+        Err(config_error("Stripe configuration not loaded").into_response())
     }
 }
 
@@ -158,7 +94,7 @@ pub async fn stripe_webhook_handler(
 
     if !state.config.use_stripe {
         // Check if Stripe is enabled
-        return (StatusCode::SERVICE_UNAVAILABLE, "Stripe service disabled.").into_response();
+        return ConnectifyError::ConfigError("Stripe service disabled".to_string()).into_response();
     }
 
     // --- Verify Signature ---
@@ -167,7 +103,10 @@ pub async fn stripe_webhook_handler(
         Ok(s) => s,
         Err(_) => {
             eprintln!("🚨 STRIPE_WEBHOOK_SECRET environment variable not set!");
-            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            return ConnectifyError::ConfigError(
+                "STRIPE_WEBHOOK_SECRET environment variable not set".to_string(),
+            )
+            .into_response();
         }
     };
 
@@ -177,16 +116,13 @@ pub async fn stripe_webhook_handler(
         .and_then(|h| h.to_str().ok());
 
     // Call the verification function from logic.rs
-    match verify_stripe_signature(&body.as_bytes(), sig_header, &webhook_secret) {
-        Ok(_) => {
-            println!("✅ Stripe webhook signature verified.");
-        }
-        Err(e) => {
-            eprintln!("Stripe webhook signature verification failed: {:?}", e);
-            // Return 400 Bad Request for signature errors
-            return (StatusCode::BAD_REQUEST, format!("Invalid signature: {}", e)).into_response();
-        }
+    if let Err(e) = verify_stripe_signature(&body.as_bytes(), sig_header, &webhook_secret) {
+        eprintln!("Stripe webhook signature verification failed: {:?}", e);
+        // Return 400 Bad Request for signature errors
+        return ConnectifyError::from(e).into_response();
     }
+
+    println!("✅ Stripe webhook signature verified.");
 
     // --- Process Payload ---
     // Deserialize the raw body into StripeEvent AFTER signature verification
@@ -194,15 +130,14 @@ pub async fn stripe_webhook_handler(
         Ok(ev) => ev,
         Err(e) => {
             eprintln!("Failed to deserialize Stripe webhook event: {}", e);
-            return (
-                StatusCode::BAD_REQUEST,
-                "Invalid payload format".to_string(),
-            )
+            return ConnectifyError::ParseError(format!("Invalid webhook payload: {}", e))
                 .into_response();
         }
     };
+
     let app_config = state.config.clone(); // Clone the AppConfig for processing the webhook
-                                           // Call the processing logic from logic.rs
+
+    // Call the processing logic from logic.rs
     match process_stripe_webhook(event, app_config.clone()).await {
         Ok(()) => {
             println!("Stripe webhook processed successfully.");
@@ -210,12 +145,8 @@ pub async fn stripe_webhook_handler(
         }
         Err(e) => {
             eprintln!("Error processing Stripe webhook: {}", e);
-            // Return 500 for internal processing errors
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Webhook processing error: {}", e),
-            )
-                .into_response()
+            // Convert StripeError to ConnectifyError and then to a Response
+            ConnectifyError::from(e).into_response()
         }
     }
 }
@@ -313,35 +244,29 @@ pub struct GetSessionDetailsQuery {
 pub async fn get_checkout_session_details_handler(
     State(state): State<Arc<StripeState>>, // Needs state to check if Stripe is enabled/configured
     Query(query): Query<GetSessionDetailsQuery>,
-) -> Result<Json<StripeCheckoutSessionData>, (StatusCode, String)> {
+) -> Result<Json<StripeCheckoutSessionData>, Response> {
     if !state.config.use_stripe || state.config.stripe.is_none() {
-        return Err((
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Stripe service not configured or disabled.".to_string(),
-        ));
+        return Err(ConnectifyError::ConfigError(
+            "Stripe service not configured or disabled".to_string(),
+        )
+        .into_response());
     }
 
-    match get_checkout_session_details(&query.session_id).await {
-        Ok(session_data) => Ok(Json(session_data)),
-        Err(StripeError::SessionNotFoundOrNotPaid) => Err((
-            StatusCode::NOT_FOUND,
-            "Checkout session not found or payment not completed.".to_string(),
-        )),
-        Err(e) => {
-            eprintln!("Error retrieving Stripe session details: {}", e);
-            Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to retrieve session details: {}", e),
-            ))
-        }
-    }
+    // Use map_json_error to convert StripeError to ConnectifyError and then to a Response
+    map_json_error(
+        get_checkout_session_details(&query.session_id).await,
+        |err| {
+            eprintln!("Error retrieving Stripe session details: {}", err);
+            err.into() // Convert StripeError to ConnectifyError using the From implementation
+        },
+    )
 }
 #[axum::debug_handler]
 // Add OpenAPI docs if needed for admin routes
 pub async fn admin_get_checkout_session_details_handler(
     State(state): State<Arc<StripeState>>,
     Query(query): Query<GetSessionDetailsQuery>, // Assuming same query params
-) -> Result<Json<StripeCheckoutSessionData>, (StatusCode, String)> {
+) -> Result<Json<StripeCheckoutSessionData>, Response> {
     println!(
         "[ADMIN] Request to get Stripe session details: {:?}",
         query.session_id
@@ -349,26 +274,20 @@ pub async fn admin_get_checkout_session_details_handler(
     // TODO: Implement admin-specific authorization/logging if needed
 
     if !state.config.use_stripe || state.config.stripe.is_none() {
-        return Err((
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Stripe service not configured or disabled.".to_string(),
-        ));
+        return Err(ConnectifyError::ConfigError(
+            "Stripe service not configured or disabled".to_string(),
+        )
+        .into_response());
     }
 
-    match crate::logic::get_checkout_session_details(&query.session_id).await {
-        Ok(session_data) => Ok(Json(session_data)),
-        Err(StripeError::SessionNotFoundOrNotPaid) => Err((
-            StatusCode::NOT_FOUND,
-            "Checkout session not found or payment not completed.".to_string(),
-        )),
-        Err(e) => {
-            eprintln!("[ADMIN] Error retrieving Stripe session details: {}", e);
-            Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to retrieve session details: {}", e),
-            ))
-        }
-    }
+    // Use map_json_error to convert StripeError to ConnectifyError and then to a Response
+    map_json_error(
+        crate::logic::get_checkout_session_details(&query.session_id).await,
+        |err| {
+            eprintln!("[ADMIN] Error retrieving Stripe session details: {}", err);
+            err.into() // Convert StripeError to ConnectifyError using the From implementation
+        },
+    )
 }
 
 // --- NEW: Admin Handler to list Checkout Sessions ---
@@ -388,7 +307,7 @@ pub async fn admin_get_checkout_session_details_handler(
 pub async fn admin_list_checkout_sessions_handler(
     State(state): State<Arc<StripeState>>,
     Query(query_params): Query<ListSessionsAdminQuery>,
-) -> Result<Json<ListSessionsAdminResponse>, (StatusCode, String)> {
+) -> Result<Json<ListSessionsAdminResponse>, Response> {
     println!(
         "[ADMIN] Listing Stripe Checkout Sessions. Params: {:?}",
         query_params
@@ -396,42 +315,15 @@ pub async fn admin_list_checkout_sessions_handler(
     // TODO: Implement admin-specific authorization here
 
     if !state.config.use_stripe || state.config.stripe.is_none() {
-        return Err((
-            StatusCode::SERVICE_UNAVAILABLE,
-            "Stripe service not configured or disabled.".to_string(),
-        ));
+        return Err(ConnectifyError::ConfigError(
+            "Stripe service not configured or disabled".to_string(),
+        )
+        .into_response());
     }
 
-    match list_checkout_sessions_admin(query_params).await {
-        Ok(list_response) => Ok(Json(list_response)),
-        Err(e) => {
-            eprintln!("[ADMIN] Error listing Stripe sessions: {}", e);
-            // Map StripeError to a tuple for Axum response
-            match e {
-                StripeError::ConfigError => Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Stripe configuration error.".to_string(),
-                )),
-                StripeError::RequestError(re) => Err((
-                    StatusCode::BAD_GATEWAY,
-                    format!("Stripe API request error: {}", re),
-                )),
-                StripeError::ApiError {
-                    status_code,
-                    message,
-                } => Err((
-                    StatusCode::from_u16(status_code).unwrap_or(StatusCode::BAD_GATEWAY),
-                    message,
-                )),
-                StripeError::ParseError(pe) => Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to parse Stripe response: {}", pe),
-                )),
-                _ => Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Failed to list Stripe sessions.".to_string(),
-                )),
-            }
-        }
-    }
+    // Use map_json_error to convert StripeError to ConnectifyError and then to a Response
+    map_json_error(list_checkout_sessions_admin(query_params).await, |err| {
+        eprintln!("[ADMIN] Error listing Stripe sessions: {}", err);
+        err.into() // Convert StripeError to ConnectifyError using the From implementation
+    })
 }

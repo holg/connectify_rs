@@ -2,8 +2,6 @@
 #![allow(dead_code)] // Allow dead code for doc functions as long as they are not used, bcs of WIP
 use chrono::Utc;
 use connectify_config::PayrexxConfig; // Use config types from connectify_config
-use once_cell::sync::Lazy;
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use thiserror::Error; // Use BTreeMap for ordered params for signing
@@ -18,6 +16,9 @@ use serde_urlencoded;
 // Conditionally import ToSchema if openapi feature is enabled
 #[cfg(feature = "openapi")]
 use utoipa::ToSchema;
+
+// Import the HTTP client from connectify_common
+use connectify_common::HTTP_CLIENT;
 
 // --- Error Handling ---
 #[derive(Error, Debug)]
@@ -39,11 +40,6 @@ pub enum PayrexxError {
     #[error("Internal processing error: {0}")]
     InternalError(String),
 }
-
-// --- Static HTTP Client ---
-// Initialize reqwest client lazily and store it statically
-// This client will be reused for all Payrexx API calls within this crate
-static HTTP_CLIENT: Lazy<Client> = Lazy::new(Client::new);
 
 // --- Data Structures ---
 

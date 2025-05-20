@@ -1,9 +1,11 @@
 // --- File: crates/connectify_gcal/src/logic.rs ---
 use crate::auth::HubType; // Use the specific Hub type alias
+use crate::service::{GcalServiceError, GoogleCalendarService};
 use chrono::{DateTime, Datelike, Duration, NaiveTime, Utc, Weekday}; // Use chrono Duration
-use google_calendar3::api::{Event, EventDateTime, FreeBusyRequest, FreeBusyRequestItem};
+use connectify_common::services::{CalendarEvent as CommonCalendarEvent, CalendarService};
+use google_calendar3::api::Event; //, EventDateTime};
 use serde::{Deserialize, Serialize};
-
+use std::sync::Arc; //, CalendarEventResult, , BookedEvent as CommonBookedEvent};
 
 // To access GCal config
 #[cfg(feature = "openapi")]
@@ -23,6 +25,8 @@ pub enum GcalError {
     Conflict,
     #[error("No matching price tier found for duration: {0} minutes")] // Added for pricing
     NoMatchingPriceTier(i64),
+    #[error("Calendar service error: {0}")]
+    ServiceError(#[from] GcalServiceError),
 }
 
 // --- Data Structures ---
@@ -46,7 +50,7 @@ pub struct AvailabilityQuery {
 #[derive(Serialize, Debug)]
 #[cfg_attr(feature = "openapi", derive(ToSchema))]
 pub struct AvailableSlotsResponse {
-    pub slots: Vec<PricedSlot>, 
+    pub slots: Vec<PricedSlot>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -92,44 +96,14 @@ pub async fn get_busy_times(
     start_time: DateTime<Utc>,
     end_time: DateTime<Utc>,
 ) -> Result<Vec<(DateTime<Utc>, DateTime<Utc>)>, GcalError> {
-    let req = FreeBusyRequest {
-        time_min: Some(start_time),
-        time_max: Some(end_time),
-        // Consider using the calendar's primary timezone if known, otherwise UTC is safe
-        time_zone: Some("UTC".to_string()),
-        items: Some(vec![FreeBusyRequestItem {
-            id: Some(calendar_id.to_string()),
-            ..Default::default()
-        }]),
-        ..Default::default()
-    };
+    // Create a GoogleCalendarService instance
+    let service = GoogleCalendarService::new(Arc::new(hub.clone()));
 
-    // Make the API call
-    // result.0 is Response<>, result.1 is FreeBusyResponse
-    let (_response, freebusy_response) = hub.freebusy().query(req).doit().await?;
+    // Use the service to get busy times
+    let busy_periods = service
+        .get_busy_times(calendar_id, start_time, end_time)
+        .await?;
 
-    let mut busy_periods = Vec::new();
-
-    // Extract busy periods for the specified calendar
-    if let Some(calendars) = freebusy_response.calendars {
-        if let Some(cal_info) = calendars.get(calendar_id) {
-            if let Some(busy_times) = &cal_info.busy {
-                for period in busy_times {
-                    if let (Some(start_dt), Some(end_dt)) = (period.start, period.end) {
-                        // Assume start/end are DateTime<Utc> directly from google-calendar3 v5+
-                        busy_periods.push((start_dt, end_dt));
-                    } else {
-                        eprintln!(
-                            "Warning: Skipping busy period with missing start/end: {:?}",
-                            period
-                        );
-                    }
-                }
-            }
-        }
-    }
-    // Sort busy periods for easier processing
-    busy_periods.sort_by_key(|k| k.0);
     Ok(busy_periods)
 }
 
@@ -180,8 +154,13 @@ pub fn calculate_available_slots(
         let time_of_day = potential_start_time.time();
         let end_time_of_day = potential_end_time.time(); // Need to check end time too
 
+        // Debug print to help diagnose issues
+        // println!("Checking slot: {:?}, day: {:?}, time: {:?}, end_time: {:?}",
+        //          potential_start_time, day_of_week, time_of_day, end_time_of_day);
+
         if !working_days.contains(&day_of_week) ||
             time_of_day < work_start_time ||
+            time_of_day > work_end_time || // Check start time is before work_end_time
             end_time_of_day > work_end_time ||
             // Handle edge case where appointment crosses midnight (if allowed)
             (potential_end_time.date_naive() != potential_start_time.date_naive() && end_time_of_day > NaiveTime::from_hms_opt(0,0,0).unwrap())
@@ -225,62 +204,26 @@ pub async fn create_calendar_event(
     calendar_id: &str,
     request: BookSlotRequest,
 ) -> Result<Event, GcalError> {
-    // Return the created Event or an error
+    // Create a GoogleCalendarService instance
+    let service = GoogleCalendarService::new(Arc::new(hub.clone()));
 
-    // Parse start and end times from request strings
-    let start_dt = DateTime::parse_from_rfc3339(&request.start_time)
-        .map_err(|e| GcalError::TimeParseError(format!("Invalid start_time: {}", e)))?
-        .with_timezone(&Utc);
-    let end_dt = DateTime::parse_from_rfc3339(&request.end_time)
-        .map_err(|e| GcalError::TimeParseError(format!("Invalid end_time: {}", e)))?
-        .with_timezone(&Utc);
-
-    // Basic validation: end time must be after start time
-    if end_dt <= start_dt {
-        return Err(GcalError::CalculationError(
-            "End time must be after start time".to_string(),
-        ));
-    }
-
-    // Check for conflicts with existing events
-    let busy_times = get_busy_times(hub, calendar_id, start_dt, end_dt).await?;
-
-    // If there are any busy periods that overlap with our proposed event time, it's a conflict
-    for (busy_start, busy_end) in &busy_times {
-        // Check for overlap: (StartA < EndB) and (EndA > StartB)
-        if start_dt < *busy_end && end_dt > *busy_start {
-            return Err(GcalError::Conflict);
-        }
-    }
-
-    // Construct the Event object
-    let new_event = Event {
-        summary: Some(request.summary),
-        description: request.description,
-        start: Some(EventDateTime {
-            date_time: Some(start_dt),
-            time_zone: Some("UTC".to_string()), // Store event times in UTC
-            ..Default::default()
-        }),
-        end: Some(EventDateTime {
-            date_time: Some(end_dt),
-            time_zone: Some("UTC".to_string()),
-            ..Default::default()
-        }),
-        // Add attendees, reminders, etc. if needed
-        // attendees: Some(vec![EventAttendee { email: Some("attendee@example.com".to_string()), ..Default::default() }]),
-        ..Default::default() // Use default for other fields
+    // Convert BookSlotRequest to CalendarEvent
+    let calendar_event = CommonCalendarEvent {
+        start_time: request.start_time.clone(),
+        end_time: request.end_time.clone(),
+        summary: request.summary.clone(),
+        description: request.description.clone(),
     };
 
-    // Make the API call to insert the event
-    // result.0 is Response<>, result.1 is the created Event object
-    let (_response, created_event) = hub
-        .events()
-        .insert(new_event, calendar_id)
-        // Optionally add parameters like sendNotifications=true
-        // .send_notifications(true)
-        .doit()
-        .await?;
+    // Use the service to create the event
+    let result = service.create_event(calendar_id, calendar_event).await?;
+
+    // Construct a minimal Event object with the event ID and status
+    let created_event = Event {
+        id: result.event_id.clone(),
+        status: Some(result.status.clone()),
+        ..Default::default()
+    };
 
     Ok(created_event)
 }
@@ -310,80 +253,15 @@ pub async fn delete_calendar_event(
     event_id: &str,
     notify_attendees: bool,
 ) -> Result<(), GcalError> {
-    // First check if the event exists and get its status
-    let get_result = hub.events().get(calendar_id, event_id).doit().await;
+    // Create a GoogleCalendarService instance
+    let service = GoogleCalendarService::new(Arc::new(hub.clone()));
 
-    // If the event doesn't exist, consider it "successfully deleted"
-    if let Err(e) = get_result {
-        if e.to_string().contains("404") {
-            return Ok(());
-        }
-        return Err(GcalError::ApiError(e));
-    }
+    // Use the service to delete the event
+    service
+        .delete_event(calendar_id, event_id, notify_attendees)
+        .await?;
 
-    // Extract event status for making delete decision
-    let (_response, event) = get_result.unwrap();
-    let status = event.status.as_deref().unwrap_or("confirmed");
-
-    // Try to delete the event normally first
-    let delete_result = hub
-        .events()
-        .delete(calendar_id, event_id)
-        .send_updates(if notify_attendees { "all" } else { "none" })
-        .doit()
-        .await;
-
-    match delete_result {
-        Ok(_) => Ok(()), // Normal deletion successful
-        Err(e) => {
-            // If the error is due to the cancelled status, try a different approach
-            if status == "cancelled"
-                || e.to_string().contains("403")
-                || e.to_string().contains("400")
-            {
-                // Try restoring the event first
-                let sequence = event.sequence.map(|n| n + 1).unwrap_or(1);
-                let restored_event = google_calendar3::api::Event {
-                    status: Some("confirmed".to_string()),
-                    sequence: Some(sequence),
-                    ..Default::default()
-                };
-
-                // First restore to confirmed status
-                let restore_result = hub
-                    .events()
-                    .patch(restored_event, calendar_id, event_id)
-                    .send_updates("none") // Don't notify for intermediate step
-                    .doit()
-                    .await;
-
-                // Handle restoration result
-                match restore_result {
-                    Ok(_) => {
-                        // Now try deleting again
-                        hub.events()
-                            .delete(calendar_id, event_id)
-                            .send_updates(if notify_attendees { "all" } else { "none" })
-                            .doit()
-                            .await?;
-                        Ok(())
-                    }
-                    Err(_) => {
-                        // If restoration fails, we've done our best - log it and return success
-                        // We can't use the purge approach since it's not publicly available
-                        tracing::warn!(
-                            "Could not fully delete event {}, attempted restore and delete",
-                            event_id
-                        );
-                        Ok(())
-                    }
-                }
-            } else {
-                // For any other error, just pass it through
-                Err(GcalError::ApiError(e))
-            }
-        }
-    }
+    Ok(())
 }
 
 /// Marks an event as cancelled in Google Calendar without deleting it.
@@ -393,25 +271,22 @@ pub async fn mark_event_cancelled(
     event_id: &str,
     notify_attendees: bool,
 ) -> Result<Event, GcalError> {
-    let (_response, event) = hub.events().get(calendar_id, event_id).doit().await?;
+    // Create a GoogleCalendarService instance
+    let service = GoogleCalendarService::new(Arc::new(hub.clone()));
 
-    // Create a minimal event with sequence number + 1
-    let sequence = event.sequence.map(|n| n + 1).unwrap_or(1);
+    // Use the service to mark the event as cancelled
+    let result = service
+        .mark_event_cancelled(calendar_id, event_id, notify_attendees)
+        .await?;
 
-    let cancelled_event = Event {
-        status: Some("cancelled".to_string()),
-        sequence: Some(sequence),
+    // Construct a minimal Event object with the event ID and status
+    let updated_event = Event {
+        id: result.event_id.clone(),
+        status: Some(result.status.clone()),
         ..Default::default()
     };
 
-    let (_response, updated) = hub
-        .events()
-        .patch(cancelled_event, calendar_id, event_id)
-        .send_updates(if notify_attendees { "all" } else { "none" })
-        .doit()
-        .await?;
-
-    Ok(updated)
+    Ok(updated_event)
 }
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -448,102 +323,28 @@ pub async fn get_booked_events(
     end_time: DateTime<Utc>,
     include_cancelled: bool,
 ) -> Result<Vec<BookedEvent>, GcalError> {
-    // Create the events list request
-    let mut request = hub
-        .events()
-        .list(calendar_id)
-        .time_min(start_time)
-        .time_max(end_time)
-        .single_events(true) // Expand recurring events
-        .order_by("startTime"); // Sort by start time
+    // Create a GoogleCalendarService instance
+    let service = GoogleCalendarService::new(Arc::new(hub.clone()));
 
-    // This is a key parameter for Google Calendar API to include cancelled events
-    request = request.show_deleted(include_cancelled);
+    // Use the service to get booked events
+    let events = service
+        .get_booked_events(calendar_id, start_time, end_time, include_cancelled)
+        .await?;
 
-    // Add debug output
-    println!(
-        "Fetching events with include_cancelled={}",
-        include_cancelled
-    );
-
-    // Make the API call
-    let (_, events_list) = request.doit().await?;
-
-    println!(
-        "Received {} events from Google Calendar API",
-        events_list.items.as_ref().map_or(0, |items| items.len())
-    );
-
-    let mut booked_events = Vec::new();
-
-    if let Some(items) = events_list.items {
-        for event in items {
-            // Debug each event status
-            let status = event.status.as_deref().unwrap_or("(no status)");
-            println!(
-                "Processing event ID: {}, Status: {}",
-                event.id.as_deref().unwrap_or("(no id)"),
-                status
-            );
-
-            // Skip cancelled events if not including them - but this shouldn't be needed
-            // as show_deleted parameter should handle this. Keep as a safety check.
-            if !include_cancelled && status == "cancelled" {
-                println!("Skipping cancelled event due to include_cancelled=false");
-                continue;
-            }
-
-            // Extract the needed fields
-            let event_id = event.id.unwrap_or_default();
-            let summary = event.summary.unwrap_or_default();
-            let description = event.description;
-
-            // Handle start time
-            let start_time = match event.start {
-                Some(start) => match start.date_time {
-                    Some(dt) => dt.to_rfc3339(),
-                    None => match start.date {
-                        Some(d) => format!("{}T00:00:00Z", d),
-                        None => "Unknown start time".to_string(),
-                    },
-                },
-                None => "Unknown start time".to_string(),
-            };
-
-            // Handle end time
-            let end_time = match event.end {
-                Some(end) => match end.date_time {
-                    Some(dt) => dt.to_rfc3339(),
-                    None => match end.date {
-                        Some(d) => format!("{}T23:59:59Z", d),
-                        None => "Unknown end time".to_string(),
-                    },
-                },
-                None => "Unknown end time".to_string(),
-            };
-
-            let status = event.status.unwrap_or_else(|| "confirmed".to_string());
-            let created = event.created.map(|dt| dt.to_rfc3339()).unwrap_or_default();
-            let updated = event.updated.map(|dt| dt.to_rfc3339()).unwrap_or_default();
-
-            // Add this event to our results
-            booked_events.push(BookedEvent {
-                event_id,
-                summary,
-                description,
-                start_time,
-                end_time,
-                status,
-                created,
-                updated,
-            });
-
-            println!(
-                "Added event to response list. Total count: {}",
-                booked_events.len()
-            );
-        }
-    }
+    // Convert the events to the format expected by the handlers
+    let booked_events = events
+        .into_iter()
+        .map(|event| BookedEvent {
+            event_id: event.event_id,
+            summary: event.summary,
+            description: event.description,
+            start_time: event.start_time,
+            end_time: event.end_time,
+            status: event.status,
+            created: event.created,
+            updated: event.updated,
+        })
+        .collect();
 
     Ok(booked_events)
 }

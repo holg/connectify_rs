@@ -11,6 +11,7 @@ use std::{error::Error, path::Path};
 
 // Type aliases for clarity
 type Connector = hyper_rustls::HttpsConnector<HttpConnector>;
+
 pub type HubType = CalendarHub<Connector>;
 
 pub async fn create_calendar_hub(

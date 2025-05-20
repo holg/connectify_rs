@@ -2,7 +2,7 @@ use config::{Config, ConfigError, Environment, File};
 use once_cell::sync::OnceCell;
 use std::env;
 use std::path::PathBuf;
-use serde_json::{Value, Map};
+use serde_json::{Value};
 pub mod models;
 use dotenv;
 pub use models::*;
