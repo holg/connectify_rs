@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::logic::calculate_available_slots;
-    use chrono::{DateTime, Datelike, Duration, NaiveTime, TimeDelta, Utc, Weekday};
+    use chrono::{DateTime, Duration, NaiveTime, Utc, Weekday};
     use proptest::prelude::*;
 
     // Helper function to create a valid time range

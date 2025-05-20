@@ -1,13 +1,13 @@
 #[cfg(test)]
 mod tests {
     use crate::logic::calculate_available_slots;
-    use chrono::{DateTime, Datelike, Duration, NaiveTime, TimeDelta, TimeZone, Utc, Weekday};
+    use chrono::{DateTime, Datelike, Duration, NaiveTime, TimeZone, Utc, Weekday};
     use tracing::info;
     #[test]
     fn test_calculate_available_slots_no_busy_periods() {
         // Test case: No busy periods, should return slots at regular intervals
         // Use a fixed date (Monday) for deterministic testing
-        let query_start = Utc.ymd(2025, 5, 5).and_hms(0, 0, 0); // Monday
+        let query_start = Utc.with_ymd_and_hms(2025, 5, 5, 0, 0, 0).unwrap(); // Monday
         let query_end = query_start + Duration::days(1);
         let busy_periods: Vec<(DateTime<Utc>, DateTime<Utc>)> = Vec::new();
         let duration = Duration::minutes(60);
@@ -83,7 +83,7 @@ mod tests {
     fn test_calculate_available_slots_with_busy_periods() {
         // Test case: Some busy periods, should return slots that don't overlap
         // Use a fixed date (Monday) for deterministic testing
-        let query_start = Utc.ymd(2025, 5, 5).and_hms(0, 0, 0); // Monday
+        let query_start = Utc.with_ymd_and_hms(2025, 5, 5, 0, 0, 0).unwrap(); // Monday
         let query_end = query_start + Duration::days(1);
 
         // Create a busy period in the middle of the day
@@ -149,7 +149,7 @@ mod tests {
     fn test_calculate_available_slots_with_buffer() {
         // Test case: With buffer time between appointments
         // Use a fixed date (Monday) for deterministic testing
-        let query_start = Utc.ymd(2025, 5, 5).and_hms(0, 0, 0); // Monday
+        let query_start = Utc.with_ymd_and_hms(2025, 5, 5, 0, 0, 0).unwrap(); // Monday
         let query_end = query_start + Duration::days(1);
         let busy_periods: Vec<(DateTime<Utc>, DateTime<Utc>)> = Vec::new();
         let duration = Duration::minutes(60);
@@ -210,7 +210,8 @@ mod tests {
     fn test_calculate_available_slots_respects_working_hours() {
         // Test case: Ensure slots are only within working hours
         // Use a fixed date (Monday) for deterministic testing
-        let query_start = Utc.ymd(2025, 5, 5).and_hms(0, 0, 0); // Monday
+        let query_start: chrono::DateTime<chrono::Utc> =
+            Utc.with_ymd_and_hms(2025, 5, 5, 0, 0, 0).unwrap(); // Monday, May 5, 2025
         let query_end = query_start + Duration::days(1);
         let busy_periods: Vec<(DateTime<Utc>, DateTime<Utc>)> = Vec::new();
         let duration = Duration::minutes(60);

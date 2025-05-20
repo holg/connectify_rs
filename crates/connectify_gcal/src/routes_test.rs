@@ -1,12 +1,10 @@
 #[cfg(test)]
 mod tests {
     use crate::routes::routes;
-    use axum::{
-        body::Body,
-        http::{Request, StatusCode},
-        Router,
-    };
+    use axum::Router;
     use connectify_config::AppConfig;
+    #[allow(unused_imports)]
+    // the warning is due to unused imports not recognized by rustfmt, but for features
     use std::sync::Arc;
     // tower import removed as it's not available in the test environment
 
@@ -51,7 +49,7 @@ mod tests {
 
         // Try to create the router
         // This will likely fail without proper mocking of the calendar hub
-        let result = std::panic::catch_unwind(|| {
+        let _result = std::panic::catch_unwind(|| {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async {
                 let router = routes(config).await;

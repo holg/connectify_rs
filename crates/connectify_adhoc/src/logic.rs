@@ -174,7 +174,9 @@ pub async fn initiate_adhoc_session_logic(
         .price_tiers
         .iter()
         .find(|t| t.duration_minutes == request_data.duration_minutes)
-        .ok_or(AdhocSessionError::NoMatchingPriceTier(request_data.duration_minutes))?;
+        .ok_or(AdhocSessionError::NoMatchingPriceTier(
+            request_data.duration_minutes,
+        ))?;
 
     // 3. Generate unique room name
     let room_name = format!("adhoc-{}", Uuid::new_v4().simple());

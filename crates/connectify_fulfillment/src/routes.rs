@@ -7,7 +7,8 @@ use crate::handlers::FulfillmentState;
 use axum::{middleware, routing::post, Router};
 use connectify_config::AppConfig;
 use std::sync::Arc;
-#[allow(unused_imports)] // the warning is due to unused imports not recognized by rustfmt, but for features
+#[allow(unused_imports)]
+// the warning is due to unused imports not recognized by rustfmt, but for features
 use tracing::info;
 
 // Conditionally import handlers based on features enabled for this crate

@@ -6,7 +6,6 @@ mod tests {
     use crate::service::mock::MockCalendarService;
     use chrono::{DateTime, Duration, Utc};
     use connectify_common::services::{CalendarEvent, CalendarService};
-    use std::sync::Arc;
 
     #[tokio::test]
     async fn test_create_and_get_events() {

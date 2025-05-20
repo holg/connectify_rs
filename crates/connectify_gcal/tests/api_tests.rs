@@ -1,8 +1,4 @@
-use axum::{
-    body::Body,
-    http::{Request, StatusCode},
-    Router,
-};
+use axum::{body::Body, http::Request};
 use connectify_config::{AppConfig, GcalConfig, PriceTier, StripeConfig};
 use connectify_gcal::routes::routes;
 use std::sync::Arc;
@@ -116,7 +112,7 @@ async fn test_book_slot_endpoint() {
     let config = create_mock_config();
 
     // Try to create the router
-    let result = std::panic::catch_unwind(|| {
+    let _result = std::panic::catch_unwind(|| {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
             // Create the router

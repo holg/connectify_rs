@@ -144,11 +144,7 @@ pub trait NotificationService: Send + Sync {
     ) -> BoxFuture<'_, NotificationResult, Self::Error>;
 
     /// Send an SMS notification.
-    fn send_sms(
-        &self,
-        to: &str,
-        body: &str,
-    ) -> BoxFuture<'_, NotificationResult, Self::Error>;
+    fn send_sms(&self, to: &str, body: &str) -> BoxFuture<'_, NotificationResult, Self::Error>;
 }
 
 /// A factory for creating service instances.
