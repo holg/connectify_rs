@@ -23,6 +23,10 @@ pub fn create_test_calendar_event(
         end_time: end_time.to_rfc3339(),
         summary: summary.to_string(),
         description: description.map(|s| s.to_string()),
+        payment_id: None,
+        payment_amount: None,
+        payment_method: None,
+        room_name: None,
     }
 }
 
