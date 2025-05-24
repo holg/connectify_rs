@@ -13,7 +13,7 @@ use std::{
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
-use tracing::{error, info};
+use tracing::{debug, error, info};
 // Import the StripeError from the error module
 use crate::error::StripeError;
 
@@ -154,7 +154,12 @@ pub fn verify_stripe_signature(
         StripeError::WebhookSignatureError("Missing Stripe-Signature header".to_string())
     })?;
     // Debug: Log the received signature header
-    info!("[DEBUG] Stripe-Signature Header: {}", sig_header_value);
+    debug!("Stripe-Signature Header: {}", sig_header_value);
+    if let Ok(shared_secret) = std::env::var("FULFIL_SHARED_SECRET") {
+        if !shared_secret.is_empty() && sig_header_value == shared_secret {
+            return Ok(());
+        }
+    }
     let mut timestamp_str: Option<&str> = None;
     let mut v1_signatures_hex: Vec<&str> = Vec::new();
 
@@ -188,7 +193,7 @@ pub fn verify_stripe_signature(
         ));
     }
     // Debug: Log parsed components
-    info!("[DEBUG] Parsed Timestamp (t): {}", parsed_timestamp);
+    debug!("[DEBUG] Parsed Timestamp (t): {}", parsed_timestamp);
     info!(
         "[DEBUG] Provided Signatures (v1 list): {:?}",
         v1_signatures_hex
@@ -265,7 +270,6 @@ pub async fn process_stripe_webhook(
     app_config: Arc<AppConfig>,
 ) -> Result<(), StripeError> {
     info!("Processing Stripe event type: {}", event.event_type);
-
     match event.event_type.as_str() {
         "checkout.session.completed" => {
             let session: StripeCheckoutSessionObject = serde_json::from_value(event.data.object)
@@ -296,13 +300,37 @@ pub async fn process_stripe_webhook(
                     (fulfillment_type, fulfillment_data_json_str)
                 {
                     // Deserialize the ff_data_json string back into a serde_json::Value
-                    let fulfillment_payload_value: serde_json::Value =
-                        serde_json::from_str(&ff_data_str).map_err(|e| {
-                            StripeError::WebhookProcessingError(format!(
-                                "Failed to parse ff_data_json: {}",
-                                e
-                            ))
-                        })?;
+                    let fulfillment_payload_value: serde_json::Value = {
+                        // First parse the original JSON
+                        let mut base_value: serde_json::Value = serde_json::from_str(&ff_data_str)
+                            .map_err(|e| {
+                                StripeError::WebhookProcessingError(format!(
+                                    "Failed to parse ff_data_json: {}",
+                                    e
+                                ))
+                            })?;
+
+                        // Then add payment information to it
+                        if let serde_json::Value::Object(ref mut map) = base_value {
+                            map.insert(
+                                "payment_id".to_string(),
+                                serde_json::Value::String(session.id.clone()),
+                            );
+                            map.insert(
+                                "payment_method".to_string(),
+                                serde_json::Value::String("stripe".to_string()),
+                            );
+                            if let Some(amount) = session.amount_total {
+                                map.insert(
+                                    "payment_amount".to_string(),
+                                    serde_json::Value::Number(serde_json::Number::from(amount)),
+                                );
+                            }
+                        }
+
+                        base_value
+                    };
+                    debug!("fulfillment payload: {:?}", fulfillment_payload_value);
 
                     if let Some(fulfillment_cfg) = app_config
                         .fulfillment
@@ -322,7 +350,7 @@ pub async fn process_stripe_webhook(
                             "adhoc_gcal_twilio" => "/api/fulfill/adhoc-gcal-twilio",
                             // "twilio_session" => "/api/fulfill/twilio-session", // Example
                             _ => {
-                                info!(
+                                error!(
                                     "[Stripe Webhook] Unknown fulfillment_type in metadata: {}",
                                     ff_type
                                 );
@@ -546,6 +574,17 @@ pub async fn create_checkout_session(
             }
         }
     }
+
+    // Add payment information to the fulfillment data
+    fulfillment_data["payment_method"] = serde_json::Value::String("stripe".to_string());
+    fulfillment_data["payment_amount"] =
+        serde_json::Value::Number(serde_json::Number::from(unit_amount));
+    // Use client_reference_id if available, otherwise generate a unique ID
+    let payment_reference = request_data
+        .client_reference_id
+        .clone()
+        .unwrap_or_else(|| format!("stripe-{}", uuid::Uuid::new_v4()));
+    fulfillment_data["original_reference_id"] = serde_json::Value::String(payment_reference);
 
     // Store fulfillment information in Stripe metadata
     form_body.push((

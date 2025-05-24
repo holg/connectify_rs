@@ -26,7 +26,7 @@ use connectify_config::AppConfig;
 use connectify_config::StripeConfig;
 use serde::Deserialize;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{debug, error, info};
 #[cfg(feature = "openapi")]
 use utoipa::ToSchema;
 
@@ -104,7 +104,7 @@ pub async fn stripe_webhook_handler(
     let webhook_secret = match std::env::var("STRIPE_WEBHOOK_SECRET") {
         Ok(s) => s,
         Err(_) => {
-            info!("🚨 STRIPE_WEBHOOK_SECRET environment variable not set!");
+            error!("🚨 STRIPE_WEBHOOK_SECRET environment variable not set!");
             return ConnectifyError::ConfigError(
                 "STRIPE_WEBHOOK_SECRET environment variable not set".to_string(),
             )
@@ -119,34 +119,33 @@ pub async fn stripe_webhook_handler(
 
     // Call the verification function from logic.rs
     if let Err(e) = verify_stripe_signature(body.as_bytes(), sig_header, &webhook_secret) {
-        info!("Stripe webhook signature verification failed: {:?}", e);
+        error!("Stripe webhook signature verification failed: {:?}", e);
         // Return 400 Bad Request for signature errors
         return ConnectifyError::from(e).into_response();
     }
 
     info!("✅ Stripe webhook signature verified.");
-
+    debug!("Processing Stripe webhook payload: {}", body);
     // --- Process Payload ---
     // Deserialize the raw body into StripeEvent AFTER signature verification
     let event: StripeEvent = match serde_json::from_str(&body) {
         Ok(ev) => ev,
         Err(e) => {
-            info!("Failed to deserialize Stripe webhook event: {}", e);
+            error!("Failed to deserialize Stripe webhook event: {}", e);
             return ConnectifyError::ParseError(format!("Invalid webhook payload: {}", e))
                 .into_response();
         }
     };
 
     let app_config = state.config.clone(); // Clone the AppConfig for processing the webhook
-
-    // Call the processing logic from logic.rs
+    debug!("Webhook event: {:?}", event); // Call the processing logic from logic.rs
     match process_stripe_webhook(event, app_config.clone()).await {
         Ok(()) => {
             info!("Stripe webhook processed successfully.");
             StatusCode::OK.into_response() // Return 200 OK to Stripe
         }
         Err(e) => {
-            info!("Error processing Stripe webhook: {}", e);
+            error!("Error processing Stripe webhook: {}", e);
             // Convert StripeError to ConnectifyError and then to a Response
             ConnectifyError::from(e).into_response()
         }

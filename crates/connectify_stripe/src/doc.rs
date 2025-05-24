@@ -42,6 +42,9 @@ fn doc_create_checkout_session_handler() {}
     post,
     path = "/stripe/webhook", // Path relative to /api
     request_body = StripeEvent, // Main event object from logic.rs
+    params(
+        ("Stripe-Signature" = String, Header, description = "Signature header from Stripe to verify webhook authenticity. Contains timestamp and signatures.", example = "t=1613979928,v1=a1b2c3d4e5f6g7h8i9j0...")
+    ),
     responses(
         (status = 200, description = "Webhook received and acknowledged"),
         (status = 400, description = "Bad Request (e.g., invalid signature, bad payload)"),
