@@ -26,12 +26,6 @@ pub use http::{
     handle_json_result, handle_result, map_error, map_json_error, IntoHttpResponse,
 };
 
-// Re-export logging utilities for easier access
-pub use logging::{
-    debug_log, error_log, info_log, init, init_with_level, log_error, log_result, trace_log,
-    warn_log,
-};
-
 // Re-export feature flag handling utilities for easier access
 pub use features::is_feature_enabled;
 

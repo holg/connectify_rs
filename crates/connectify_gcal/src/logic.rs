@@ -76,6 +76,10 @@ pub struct BookSlotRequest {
     pub end_time: String,   // ISO 8601 format string
     pub summary: String,    // Event title
     pub description: Option<String>,
+    pub payment_method: Option<String>,
+    pub payment_id: Option<String>,
+    pub payment_amount: Option<i64>,
+    pub room_name: Option<String>,
     // Add attendee emails, etc., if needed
 }
 
@@ -234,6 +238,11 @@ pub async fn create_calendar_event(
         end_time: request.end_time.clone(),
         summary: request.summary.clone(),
         description: request.description.clone(),
+        // TODO move these values into Description / Summary fields as needed, for now they are skipped on serde serialize
+        payment_method: request.payment_method.clone(),
+        payment_id: request.payment_id.clone(),
+        payment_amount: request.payment_amount,
+        room_name: request.room_name.clone(),
     };
 
     // Use the service to create the event
@@ -328,6 +337,10 @@ pub struct BookedEvent {
     pub status: String,     // "confirmed", "cancelled", etc.
     pub created: String,    // ISO 8601 format
     pub updated: String,    // ISO 8601 format
+    pub payment_method: Option<String>,
+    pub payment_id: Option<String>,
+    pub payment_amount: Option<i64>,
+    pub room_name: Option<String>,
 }
 
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -364,6 +377,10 @@ pub async fn get_booked_events(
             status: event.status,
             created: event.created,
             updated: event.updated,
+            payment_method: event.payment_method,
+            payment_id: event.payment_id,
+            payment_amount: event.payment_amount,
+            room_name: event.room_name,
         })
         .collect();
 

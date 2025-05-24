@@ -25,6 +25,10 @@ mod tests {
             end_time: end_time.to_rfc3339(),
             summary: "Test Event".to_string(),
             description: Some("This is a test event".to_string()),
+            payment_id: None,
+            payment_amount: None,
+            payment_method: None,
+            room_name: None,
         };
 
         // Create the event
@@ -114,6 +118,10 @@ mod tests {
             end_time: end_time.to_rfc3339(),
             summary: "Test Event".to_string(),
             description: Some("This is a test event".to_string()),
+            payment_id: None,
+            payment_amount: None,
+            payment_method: None,
+            room_name: None,
         };
 
         // Create the event
@@ -151,6 +159,10 @@ mod tests {
             end_time: (end_time + Duration::minutes(30)).to_rfc3339(),
             summary: "Overlapping Event".to_string(),
             description: None,
+            payment_id: None,
+            payment_amount: None,
+            payment_method: None,
+            room_name: None,
         };
 
         // This should fail with a conflict error
@@ -165,6 +177,10 @@ mod tests {
             end_time: (end_time + Duration::minutes(90)).to_rfc3339(),
             summary: "Non-overlapping Event".to_string(),
             description: None,
+            payment_id: None,
+            payment_amount: None,
+            payment_method: None,
+            room_name: None,
         };
 
         // This should succeed

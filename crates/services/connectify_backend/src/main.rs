@@ -7,8 +7,7 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 #[allow(unused_imports)]
-use tracing::{info, warn}; // we shall add more warns, even so now only some feature uses it right nwo
-                           // use axum::{extract::State, Json};
+use tracing::{debug, info, warn}; // we shall add more warns, even so now only some feature uses it right nwo
 
 // Import the AppState and AppStateBuilder from the app_state module
 mod app_state;
@@ -20,12 +19,16 @@ use app_state::AppState;
 // }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging with default level (INFO)
-    logging::init();
+    logging::init_logging("connectify-backend")?;
 
+    tracing::info!("✅ Logging initialized");
     info!("Starting Connectify backend service");
-
+    debug!(
+        "Environment: {}",
+        std::env::var("RUST_LOG").unwrap_or_default()
+    );
     let config = Arc::new(load_config().expect("Failed to load config"));
     info!("✅ Configuration loaded.");
 
@@ -209,7 +212,6 @@ async fn main() {
     info!("Starting server at http://{}", addr);
     info!("API endpoints available at http://{}/api", addr);
 
-    axum::serve(listener, app.into_make_service())
-        .await
-        .unwrap();
+    axum::serve(listener, app.into_make_service()).await?;
+    Ok(())
 }

@@ -1,160 +1,66 @@
-//! Logging utilities for the Connectify application.
-//!
-//! This module provides a standardized approach to logging across all crates
-//! in the Connectify application. It includes functions for initializing the
-//! tracing subscriber and for logging at different levels.
+// src/logging.rs
+use std::env;
+use std::fs;
+use std::path::PathBuf;
+use tracing_appender::rolling;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter, Registry};
 
-use tracing::{debug, error, info, trace, warn, Level};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-
-/// Initialize the tracing subscriber.
-///
-/// This function should be called at the start of the application to set up
-/// logging. It configures the tracing subscriber with the specified log level
-/// and formats log messages with timestamps, log levels, targets, and file/line
-/// information.
-///
-/// # Arguments
-///
-/// * `level` - The minimum log level to display. Defaults to INFO if not specified.
-///
-/// # Examples
-///
-/// ```
-/// use connectify_common::logging;
-///
-/// // Initialize with default log level (INFO)
-/// logging::init();
-///
-/// // Initialize with a specific log level
-/// logging::init_with_level(tracing::Level::DEBUG);
-/// ```
-pub fn init() {
-    init_with_level(Level::INFO);
-}
-
-/// Initialize the tracing subscriber with a specific log level.
-///
-/// This function allows specifying a custom log level when initializing the
-/// tracing subscriber.
-///
-/// # Arguments
-///
-/// * `level` - The minimum log level to display.
-pub fn init_with_level(level: Level) {
-    // Create a filter based on the specified level
-    let filter = EnvFilter::from_default_env()
-        .add_directive(format!("connectify={}", level).parse().unwrap());
-
-    // Initialize the subscriber with the filter
-    // Use try_init to handle the case where a global default subscriber has already been set
-    let result = tracing_subscriber::registry()
-        .with(
-            fmt::layer()
-                .with_target(true)
-                .with_file(true)
-                .with_line_number(true)
-                .with_thread_ids(true)
-                .with_thread_names(true),
-        )
-        .with(filter)
-        .try_init();
-
-    // Only log if initialization was successful or if it failed because a subscriber was already set
-    if result.is_ok() {
-        info!("Logging initialized at level: {}", level);
+pub fn resolve_log_dir(app_name: &str) -> PathBuf {
+    #[cfg(target_os = "macos")]
+    {
+        PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".into()))
+            .join("Library")
+            .join("Logs")
+            .join(app_name)
+    }
+    #[cfg(target_os = "windows")]
+    {
+        PathBuf::from(env::var("APPDATA").unwrap_or_else(|_| ".".into()))
+            .join("AppLogs")
+            .join(app_name);
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let system_path = PathBuf::from(format!("/var/log/{}", app_name));
+        if system_path.exists()
+            && system_path.is_dir()
+            && fs::metadata(&system_path)
+                .map(|m| !m.permissions().readonly())
+                .unwrap_or(false)
+        {
+            return system_path;
+        }
+        return PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".into()))
+            .join(format!(".{}", app_name));
     }
 }
 
-/// Log a message at the TRACE level.
-///
-/// This is a convenience function that wraps the tracing::trace! macro.
-///
-/// # Arguments
-///
-/// * `message` - The message to log.
-pub fn trace_log(message: &str) {
-    trace!("{}", message);
-}
+pub fn init_logging(app_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let log_dir = resolve_log_dir(app_name);
+    fs::create_dir_all(&log_dir)?;
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
-/// Log a message at the DEBUG level.
-///
-/// This is a convenience function that wraps the tracing::debug! macro.
-///
-/// # Arguments
-///
-/// * `message` - The message to log.
-pub fn debug_log(message: &str) {
-    debug!("{}", message);
-}
+    let file_appender = rolling::daily(&log_dir, format!("{}.log", app_name));
+    let file_layer = fmt::layer()
+        .with_writer(file_appender)
+        .with_ansi(false)
+        .with_target(true);
 
-/// Log a message at the INFO level.
-///
-/// This is a convenience function that wraps the tracing::info! macro.
-///
-/// # Arguments
-///
-/// * `message` - The message to log.
-pub fn info_log(message: &str) {
-    info!("{}", message);
-}
+    let console_layer = fmt::layer().with_ansi(true).with_target(true);
 
-/// Log a message at the WARN level.
-///
-/// This is a convenience function that wraps the tracing::warn! macro.
-///
-/// # Arguments
-///
-/// * `message` - The message to log.
-pub fn warn_log(message: &str) {
-    warn!("{}", message);
-}
-
-/// Log a message at the ERROR level.
-///
-/// This is a convenience function that wraps the tracing::error! macro.
-///
-/// # Arguments
-///
-/// * `message` - The message to log.
-pub fn error_log(message: &str) {
-    error!("{}", message);
-}
-
-/// Log an error with context at the ERROR level.
-///
-/// This function logs an error along with additional context information.
-///
-/// # Arguments
-///
-/// * `error` - The error to log.
-/// * `context` - Additional context information about the error.
-pub fn log_error<E: std::fmt::Display>(error: E, context: &str) {
-    error!("{}: {}", context, error);
-}
-
-/// Log a result, with different messages for success and error cases.
-///
-/// This function logs a success message at the INFO level if the result is Ok,
-/// or an error message at the ERROR level if the result is Err.
-///
-/// # Arguments
-///
-/// * `result` - The result to log.
-/// * `success_message` - The message to log if the result is Ok.
-/// * `error_context` - Additional context information to include if the result is Err.
-///
-/// # Returns
-///
-/// The original result, allowing this function to be used in a chain.
-pub fn log_result<T, E: std::fmt::Display>(
-    result: Result<T, E>,
-    success_message: &str,
-    error_context: &str,
-) -> Result<T, E> {
-    match &result {
-        Ok(_) => info!("{}", success_message),
-        Err(e) => error!("{}: {}", error_context, e),
-    }
-    result
+    {
+        let s = Registry::default()
+            .with(filter)
+            .with(file_layer)
+            .with(console_layer);
+        #[cfg(target_os = "linux")]
+        {
+            if let Ok(journald) = tracing_journald::layer() {
+                return tracing::subscriber::set_global_default(s.with(journald))
+                    .map_err(Box::<dyn std::error::Error>::from);
+            }
+        }
+        tracing::subscriber::set_global_default(s).map_err(Box::<dyn std::error::Error>::from)
+    }?;
+    Ok(())
 }

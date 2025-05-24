@@ -25,5 +25,8 @@ serde_json = { workspace = true }
 once_cell = { workspace = true }
 chrono = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+# Journald is Linux-only; compile gated with #[cfg]
+tracing-journald = {  workspace = true }
 connectify-config = { path = "../connectify_config" }

@@ -73,7 +73,10 @@ pub struct GcalBookingFulfillmentRequest {
     pub description: Option<String>,
     // Potentially other details like user_id, original_reference_id for logging/tracking
     pub original_reference_id: Option<String>,
-    pub room_name: String,
+    pub payment_id: Option<String>,     // e.g., Stripe payment ID
+    pub payment_method: Option<String>, // e.g., "stripe"
+    pub payment_amount: Option<i64>,    // e.g., 1000 (in cents)
+    pub room_name: Option<String>,
 }
 
 // TODO: Add request structs for other fulfillment types
@@ -119,6 +122,14 @@ pub async fn fulfill_gcal_booking_logic(
         end_time: payload.end_time,
         summary: payload.summary.clone(),
         description: payload.description,
+        payment_method: payload.payment_method,
+        payment_amount: payload.payment_amount,
+        payment_id: Some(
+            payload
+                .payment_id
+                .unwrap_or_else(|| format!("gcal-booking-{}", chrono::Utc::now().timestamp())),
+        ),
+        room_name: payload.room_name.clone(),
         // Add other fields if GcalBookSlotRequest expects them
     };
 
@@ -139,7 +150,7 @@ pub async fn fulfill_gcal_booking_logic(
                 success: true,
                 message: "Google Calendar event booked successfully.".to_string(),
                 event_id,
-                room_name: Some(payload.room_name),
+                room_name: payload.room_name,
             })
         }
         Err(GcalError::Conflict) => {
@@ -169,6 +180,9 @@ pub struct AdhocGcalTwilioFulfillmentRequest {
     #[cfg_attr(feature = "openapi", schema(example = "adhoc-xyz123-abc"))]
     pub room_name: String,
     pub original_reference_id: Option<String>,
+    pub payment_method: Option<String>,
+    pub payment_amount: Option<i64>,
+    pub payment_id: Option<String>,
 }
 
 #[cfg(feature = "gcal")] // This fulfillment type also depends on GCal
@@ -196,6 +210,14 @@ pub async fn fulfill_adhoc_gcal_twilio_logic(
         end_time: payload.end_time,
         summary: payload.summary.clone(),
         description: payload.description,
+        payment_method: Some(payload.payment_method.unwrap_or("stripe".to_string())),
+        payment_amount: Some(payload.payment_amount.unwrap_or(0)),
+        payment_id: Some(
+            payload
+                .original_reference_id
+                .unwrap_or_else(|| format!("adhoc-booking-{}", chrono::Utc::now().timestamp())),
+        ),
+        room_name: Some(payload.room_name.clone()),
     };
 
     match gcal_create_event(&hub, calendar_id_to_use, gcal_book_request).await {
@@ -203,7 +225,8 @@ pub async fn fulfill_adhoc_gcal_twilio_logic(
             let event_id = created_event.id;
             info!(
                 "[Fulfillment Logic] Successfully booked Adhoc GCal event. ID: {:?}, Room: {}",
-                event_id, payload.room_name
+                event_id,
+                payload.room_name.clone()
             );
             Ok(FulfillmentResponse {
                 success: true,

@@ -3,16 +3,36 @@
 //!
 //! This module provides an implementation of the CalendarService trait for Google Calendar.
 
+use crate::auth::HubType;
 use chrono::{DateTime, Utc};
 use connectify_common::services::{
     BookedEvent, CalendarEvent, CalendarEventResult, CalendarService,
 };
-use google_calendar3::api::{Event, EventDateTime, FreeBusyRequest, FreeBusyRequestItem};
-use std::sync::Arc;
+use google_calendar3::api::{
+    Event, EventDateTime, EventExtendedProperties, FreeBusyRequest, FreeBusyRequestItem,
+};
+use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 use tracing::info;
 
-use crate::auth::HubType;
+pub fn extract_payment_metadata(event: &CalendarEvent) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+
+    if let Some(method) = &event.payment_method {
+        map.insert("payment_method".to_string(), method.clone());
+    }
+    if let Some(id) = &event.payment_id {
+        map.insert("payment_id".to_string(), id.clone());
+    }
+    if let Some(amount) = event.payment_amount {
+        map.insert("payment_amount".to_string(), amount.to_string());
+    }
+    if let Some(room_name) = &event.room_name {
+        map.insert("room_name".to_string(), room_name.to_string());
+    }
+
+    map
+}
 
 /// Errors that can occur when interacting with Google Calendar.
 #[derive(Error, Debug)]
@@ -236,9 +256,11 @@ impl CalendarService for GoogleCalendarService {
                     return Err(GcalServiceError::Conflict);
                 }
             }
+            // Add payment information to extended properties if available
+            let payment_metadata = extract_payment_metadata(&event);
 
             // Construct the Event object
-            let new_event = Event {
+            let mut gcal_event = Event {
                 summary: Some(event.summary),
                 description: event.description,
                 start: Some(EventDateTime {
@@ -254,10 +276,18 @@ impl CalendarService for GoogleCalendarService {
                 ..Default::default() // Use default for other fields
             };
 
+            // Add payment metadata if available to the private extended properties
+            if !payment_metadata.is_empty() {
+                gcal_event.extended_properties = Some(EventExtendedProperties {
+                    private: Some(payment_metadata),
+                    shared: None,
+                });
+            }
+
             // Make the API call to insert the event
             let (_response, created_event) = calendar_hub
                 .events()
-                .insert(new_event, &calendar_id)
+                .insert(gcal_event, &calendar_id)
                 .doit()
                 .await?;
 
@@ -362,7 +392,7 @@ impl CalendarService for GoogleCalendarService {
                     {
                         // Try restoring the event first
                         let sequence = event.sequence.map(|n| n + 1).unwrap_or(1);
-                        let restored_event = google_calendar3::api::Event {
+                        let restored_event = Event {
                             status: Some("confirmed".to_string()),
                             sequence: Some(sequence),
                             ..Default::default()
@@ -596,6 +626,30 @@ impl CalendarService for GoogleCalendarService {
                     let event_id = event.id.unwrap_or_default();
                     let summary = event.summary.unwrap_or_default();
                     let description = event.description;
+                    // Line 626 in service.rs
+                    // Line 626 in service.rs
+                    let payment_id = event.extended_properties.as_ref().and_then(|p| {
+                        p.private
+                            .as_ref()
+                            .and_then(|private_map| private_map.get("payment_id").cloned())
+                    });
+                    let payment_method = event.extended_properties.as_ref().and_then(|p| {
+                        p.private
+                            .as_ref()
+                            .and_then(|private_map| private_map.get("payment_method").cloned())
+                    });
+                    let payment_amount = event.extended_properties.as_ref().and_then(|p| {
+                        p.private.as_ref().and_then(|private_map| {
+                            private_map
+                                .get("payment_amount")
+                                .and_then(|amount_str| amount_str.parse::<i64>().ok())
+                        })
+                    });
+                    let room_name = event.extended_properties.as_ref().and_then(|p| {
+                        p.private
+                            .as_ref()
+                            .and_then(|private_map| private_map.get("room_name").cloned())
+                    });
 
                     // Handle start time
                     let start_time = match event.start {
@@ -635,6 +689,10 @@ impl CalendarService for GoogleCalendarService {
                         status,
                         created,
                         updated,
+                        payment_id,
+                        payment_method,
+                        payment_amount,
+                        room_name,
                     });
                 }
             }
@@ -876,6 +934,10 @@ pub mod mock {
                             status,
                             created: Utc::now().to_rfc3339(),
                             updated: Utc::now().to_rfc3339(),
+                            payment_id: event.payment_id,
+                            payment_method: event.payment_method,
+                            payment_amount: event.payment_amount,
+                            room_name: event.room_name,
                         });
                     }
                 }

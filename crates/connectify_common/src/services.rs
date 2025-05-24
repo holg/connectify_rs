@@ -97,7 +97,7 @@ pub trait PaymentService: Send + Sync {
     /// Error type returned by payment service operations.
     type Error: std::error::Error + Send + Sync + 'static;
 
-    /// Create a payment intent.
+    /// Create payment intent.
     fn create_payment_intent(
         &self,
         amount: i64,
@@ -106,7 +106,7 @@ pub trait PaymentService: Send + Sync {
         metadata: Option<serde_json::Value>,
     ) -> BoxFuture<'_, PaymentIntentResult, Self::Error>;
 
-    /// Confirm a payment intent.
+    /// Confirm payment intent.
     fn confirm_payment_intent(
         &self,
         payment_intent_id: &str,
@@ -174,6 +174,17 @@ pub struct CalendarEvent {
     pub summary: String,
     /// An optional description of the event.
     pub description: Option<String>,
+    // The payment method used for the event (e.g., "stripe").
+    #[serde(skip)]
+    pub payment_method: Option<String>,
+    // The payment ID or reference for the event.
+    #[serde(skip)]
+    pub payment_id: Option<String>,
+    // The payment amount in cents.
+    #[serde(skip)]
+    pub payment_amount: Option<i64>,
+    #[serde(skip)]
+    pub room_name: Option<String>,
 }
 
 /// Represents the result of a calendar event operation.
@@ -204,6 +215,11 @@ pub struct BookedEvent {
     pub created: String,
     /// When the event was last updated.
     pub updated: String,
+
+    pub payment_method: Option<String>,
+    pub payment_id: Option<String>,
+    pub payment_amount: Option<i64>,
+    pub room_name: Option<String>,
 }
 
 /// Data structures for payment service operations.
