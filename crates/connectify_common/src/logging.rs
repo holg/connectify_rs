@@ -30,8 +30,8 @@ pub fn resolve_log_dir(app_name: &str) -> PathBuf {
         {
             return system_path;
         }
-        return PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".into()))
-            .join(format!(".{}", app_name));
+        PathBuf::from(env::var("HOME").unwrap_or_else(|_| ".".into()))
+            .join(format!(".{}", app_name))
     }
 }
 
