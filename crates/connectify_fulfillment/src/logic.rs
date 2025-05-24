@@ -52,7 +52,6 @@ pub enum FulfillmentError {
     #[error("Internal fulfillment error: {0}")]
     InternalError(String),
 }
-
 // --- Request Structures for Fulfillment Tasks ---
 
 /// Data needed to fulfill a Google Calendar booking.
@@ -74,6 +73,7 @@ pub struct GcalBookingFulfillmentRequest {
     pub description: Option<String>,
     // Potentially other details like user_id, original_reference_id for logging/tracking
     pub original_reference_id: Option<String>,
+    pub room_name: String,
 }
 
 // TODO: Add request structs for other fulfillment types
@@ -139,7 +139,7 @@ pub async fn fulfill_gcal_booking_logic(
                 success: true,
                 message: "Google Calendar event booked successfully.".to_string(),
                 event_id,
-                room_name: None,
+                room_name: Some(payload.room_name),
             })
         }
         Err(GcalError::Conflict) => {

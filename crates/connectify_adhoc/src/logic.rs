@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::info;
-use uuid::Uuid; // For generating unique room names
 
 // We need to call GCal logic and Stripe logic
 #[cfg(feature = "gcal")]
@@ -179,7 +178,7 @@ pub async fn initiate_adhoc_session_logic(
         ))?;
 
     // 3. Generate unique room name
-    let room_name = format!("adhoc-{}", Uuid::new_v4().simple());
+    let room_name = format!("adhoc-{}", uuid::Uuid::new_v4());
 
     // 4. Prepare data for Stripe Checkout Session
     let gcal_summary = price_tier.product_name.clone().unwrap_or_else(|| {
@@ -205,16 +204,16 @@ pub async fn initiate_adhoc_session_logic(
         currency_override: None,     // Currency determined by tier or StripeConfig default
         fulfillment_type: "adhoc_gcal_twilio".to_string(), // New fulfillment type
         fulfillment_data,
-        client_reference_id: Some(format!("adhoc-{}", Uuid::new_v4().simple())), // Unique ref
+        client_reference_id: Some("adhoc-{{CHECKOUT_SESSION_ID}}".to_string()), // Unique ref
     };
 
     // 5. Create Stripe Checkout Session
     // The success_url needs to include the room_name for the webcam page
     let mut dynamic_stripe_config = stripe_config.clone(); // Clone to modify success_url
     dynamic_stripe_config.success_url = format!(
-        "{}?room_name={}&session_id={{CHECKOUT_SESSION_ID}}", // Assuming base success_url doesn't have query params
-        stripe_config.success_url.trim_end_matches('/'),      // Ensure no double slash
-        room_name
+        // "{}?room_name={}&session_id={{CHECKOUT_SESSION_ID}}", // Assuming base success_url doesn't have query params
+        "{}&room_name=adhoc_{{CHECKOUT_SESSION_ID}}", // Assuming base success_url doesn't have query params
+        stripe_config.success_url.trim_end_matches('/'), // Ensure no double slash
     );
     // If your base success_url already has query params, append with &
     // Example: "https://.../success.html?someparam=value&room_name=...&session_id=..."

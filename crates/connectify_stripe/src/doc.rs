@@ -3,7 +3,7 @@
 #![cfg(feature = "openapi")]
 use utoipa::OpenApi;
 // Import all relevant schemas from logic.rs and handlers.rs
-use crate::handlers::StripeRedirectQuery;
+use crate::handlers::{GetSessionDetailsQuery, StripeRedirectQuery};
 use crate::logic::{
     CreateCheckoutSessionRequest, CreateCheckoutSessionResponse, ListSessionsAdminQuery,
     ListSessionsAdminResponse, StripeCheckoutSessionData, StripeCheckoutSessionObject,
@@ -73,7 +73,8 @@ fn doc_stripe_checkout_cancel_handler() {}
 #[utoipa::path(
     get,
     path = "/stripe/order-confirmation-details", // Path relative to /api
-    params(crate::handlers::GetSessionDetailsQuery), // Use full path if ambiguous
+    params(("session_id" = String, Query, description = "The ID of the Stripe checkout")), // Use full path if ambiguous
+    // params(GetSessionDetailsQuery),
     responses(
         (status = 200, description = "Successfully retrieved checkout session details", body = StripeCheckoutSessionData),
         (status = 404, description = "Session not found or payment not completed"),
@@ -123,7 +124,8 @@ fn doc_admin_list_checkout_sessions_handler() {}
             StripeCheckoutSessionData, // Response for single session details
             ListSessionsAdminQuery,    //  query schema for admin list
             ListSessionsAdminResponse, // response schema for admin list
-            StripeListObject<StripeCheckoutSessionData> // Ensure generic list object is in schema if used directly
+            StripeListObject<StripeCheckoutSessionData>,// Ensure generic list object is in schema if used directly
+            GetSessionDetailsQuery
         )
     ),
     tags(

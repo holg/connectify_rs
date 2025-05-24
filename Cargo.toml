@@ -37,6 +37,7 @@ hmac = "0.12.1"
 sha2 = "0.10.9"
 hex = "0.4.3"
 base64 = "0.22.1"
+uuid = { version = "1", features = ["v4"] }
 serde_urlencoded = "0.7.1"
 [profile.release]
 lto = "fat"

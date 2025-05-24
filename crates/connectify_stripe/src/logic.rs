@@ -14,7 +14,6 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use tracing::{error, info};
-
 // Import the StripeError from the error module
 use crate::error::StripeError;
 
@@ -354,7 +353,7 @@ pub async fn process_stripe_webhook(
                                 let err_text = resp.text().await.unwrap_or_else(|_| {
                                     "Unknown error from fulfillment service".to_string()
                                 });
-                                info!("[Stripe Webhook] Fulfillment call for session {} (type: {}) failed: {} - {}", session.id, ff_type, status, err_text);
+                                error!("[Stripe Webhook] Fulfillment call for session {} (type: {}) failed: {} - {}", session.id, ff_type, status, err_text);
                                 return Err(StripeError::FulfillmentError(format!(
                                     "Fulfillment service call failed: {} - {}",
                                     status, err_text
@@ -523,15 +522,39 @@ pub async fn create_checkout_session(
         form_body.push(("client_reference_id".to_string(), client_ref_id.clone()));
     }
 
+    // For gcal_booking, ensure we have a room_name in the fulfillment_data
+    let mut fulfillment_data = request_data.fulfillment_data.clone();
+    if request_data.fulfillment_type == "gcal_booking"
+        && fulfillment_data.get("room_name").is_none()
+    {
+        // Generate a unique room name for gcal_booking using timestamp
+        let room_name = format!("gcal-{}", uuid::Uuid::new_v4());
+        fulfillment_data["room_name"] = serde_json::Value::String(room_name.clone());
+
+        // Also update the success_url to include the room_name
+        let mut dynamic_success_url = stripe_config.success_url.clone();
+        if dynamic_success_url.contains('?') {
+            dynamic_success_url = format!("{}&room_name={}", dynamic_success_url, room_name);
+        } else {
+            dynamic_success_url = format!("{}?room_name={}", dynamic_success_url, room_name);
+        }
+        // Replace the success_url in the form_body
+        for item in &mut form_body {
+            if item.0 == "success_url" {
+                item.1 = dynamic_success_url;
+                break;
+            }
+        }
+    }
+
     // Store fulfillment information in Stripe metadata
     form_body.push((
         "metadata[ff_type]".to_string(),
         request_data.fulfillment_type.clone(),
     ));
-    let fulfillment_data_str =
-        serde_json::to_string(&request_data.fulfillment_data).map_err(|e| {
-            StripeError::InternalError(format!("Failed to serialize fulfillment_data: {}", e))
-        })?;
+    let fulfillment_data_str = serde_json::to_string(&fulfillment_data).map_err(|e| {
+        StripeError::InternalError(format!("Failed to serialize fulfillment_data: {}", e))
+    })?;
     form_body.push(("metadata[ff_data_json]".to_string(), fulfillment_data_str));
 
     let api_url = "https://api.stripe.com/v1/checkout/sessions";
@@ -620,6 +643,7 @@ pub struct StripeCheckoutSessionData {
     pub client_reference_id: Option<String>,
     pub created: Option<i64>,
     pub expires_at: Option<i64>,
+    pub room_name: Option<String>,
     // Add other fields you might want to display on the confirmation page
 }
 

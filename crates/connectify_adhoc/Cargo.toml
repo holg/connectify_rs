@@ -23,7 +23,7 @@ thiserror = { workspace = true }
 connectify-config = { path = "../connectify_config" }
 connectify-common = { path = "../connectify_common" }
 tracing = { workspace = true }
-uuid = { version = "1", features = ["v4"] } # For unique room names
+uuid = { workspace = true } # For unique room names
 
 # Dependencies on other workspace crates for their logic
 connectify-gcal = { path = "../connectify_gcal", optional = true }
