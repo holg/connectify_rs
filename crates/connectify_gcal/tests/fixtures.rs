@@ -119,15 +119,17 @@ pub fn create_mock_config() -> Arc<AppConfig> {
 
 /// Creates working hours and days configuration for testing
 #[allow(dead_code)]
-pub fn create_working_hours_config() -> (NaiveTime, NaiveTime, [Weekday; 5]) {
-    let work_start = NaiveTime::from_hms_opt(9, 0, 0).unwrap();
-    let work_end = NaiveTime::from_hms_opt(17, 0, 0).unwrap();
+pub fn create_working_hours_config() -> (NaiveTime, NaiveTime, [Weekday; 7]) {
+    let work_start = NaiveTime::from_hms_opt(0, 0, 0).unwrap();
+    let work_end = NaiveTime::from_hms_opt(23, 59, 59).unwrap();
     let working_days = [
         Weekday::Mon,
         Weekday::Tue,
         Weekday::Wed,
         Weekday::Thu,
         Weekday::Fri,
+        Weekday::Sat,
+        Weekday::Sun,
     ];
 
     (work_start, work_end, working_days)

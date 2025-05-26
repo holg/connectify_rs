@@ -11,7 +11,8 @@ use axum::{
     http::StatusCode,
     response::Json,
 };
-use chrono::{Duration, NaiveDate, NaiveTime, TimeZone, Utc};
+use chrono::{Datelike, Duration, NaiveDate, NaiveTime, TimeZone, Timelike, Utc};
+use chrono_tz::Europe::Zurich;
 use connectify_config::{AppConfig, PriceTier}; // Use the unified config
 use std::sync::Arc;
 use tracing::info;
@@ -120,11 +121,13 @@ pub async fn get_availability_handler(
             )
         })?;
 
-    let start_naive_datetime = start_naive_date.and_hms_opt(0, 0, 0).unwrap(); // start of day
-    let end_naive_datetime = end_naive_date_inclusive.and_hms_opt(0, 0, 0).unwrap(); // start of next day
-
-    let query_start_utc = Utc.from_utc_datetime(&start_naive_datetime);
-    let query_end_utc = Utc.from_utc_datetime(&end_naive_datetime);
+    // Compute UTC boundaries for the query range using Zurich timezone
+    let start_naive_datetime = start_naive_date.and_hms_opt(0, 0, 0).unwrap();
+    let end_naive_datetime = end_naive_date_inclusive.and_hms_opt(0, 0, 0).unwrap();
+    let start_zurich = Zurich.from_local_datetime(&start_naive_datetime).unwrap();
+    let end_zurich = Zurich.from_local_datetime(&end_naive_datetime).unwrap();
+    let query_start_utc = start_zurich.with_timezone(&Utc);
+    let query_end_utc = end_zurich.with_timezone(&Utc);
 
     let appointment_duration_chrono = Duration::minutes(query.duration_minutes);
     if appointment_duration_chrono <= Duration::zero() {
@@ -155,21 +158,23 @@ pub async fn get_availability_handler(
 
     // --- Calculate Slots (using placeholder parameters for now) ---
     // TODO: Make working hours, days, buffer, step configurable via AppConfig
-    let work_start = NaiveTime::from_hms_opt(9, 0, 0).unwrap();
-    let work_end = NaiveTime::from_hms_opt(17, 0, 0).unwrap();
+    let work_start = NaiveTime::from_hms_opt(0, 0, 0).unwrap();
+    let work_end = NaiveTime::from_hms_opt(23, 59, 59).unwrap();
     let working_days = [
         chrono::Weekday::Mon,
         chrono::Weekday::Tue,
         chrono::Weekday::Wed,
         chrono::Weekday::Thu,
         chrono::Weekday::Fri,
+        chrono::Weekday::Sat,
+        chrono::Weekday::Sun,
     ];
     let buffer = Duration::minutes(0);
-    let step = Duration::minutes(15); // Slot checking interval
+    let step = Duration::minutes(15); // Check every 15 minutes
 
     let available_datetime_slots = calculate_available_slots(
-        query_start_utc,
-        query_end_utc,
+        start_zurich.with_timezone(&Utc),
+        end_zurich.with_timezone(&Utc),
         &busy_periods,
         appointment_duration_chrono,
         work_start,
@@ -177,28 +182,51 @@ pub async fn get_availability_handler(
         &working_days,
         buffer,
         step,
-    );
+    )
+    // Ensure all returned slots are UTC for consistency
+    .into_iter()
+    .collect::<Vec<_>>();
 
-    // --- Transform to PricedSlots ---
+    // --- Transform to PricedSlots, filtering and rounding based on Zurich-local full minute (zero out seconds/nanos) ---
     let priced_slots: Vec<PricedSlot> = available_datetime_slots
         .iter()
-        .map(|slot_start_utc| {
-            let slot_end_utc = *slot_start_utc + appointment_duration_chrono;
-            PricedSlot {
-                start_time: slot_start_utc.to_rfc3339(),
-                end_time: slot_end_utc.to_rfc3339(),
-                duration_minutes: query.duration_minutes, // This is the requested duration
-                price: price_tier.unit_amount,
-                currency: price_tier.currency.clone().unwrap_or_else(
-                    || {
-                        stripe_config
-                            .default_currency
-                            .clone()
-                            .unwrap_or_else(|| "USD".to_string())
-                    }, // Fallback currency
-                ),
-                product_name: price_tier.product_name.clone(),
+        .filter_map(|slot_start_utc| {
+            let slot_local = chrono::DateTime::parse_from_rfc3339(slot_start_utc.0.as_str())
+                .ok()
+                .map(|dt| dt.with_timezone(&Zurich))?;
+
+            // Keep the full minute-resolution, only zero out seconds and nanoseconds
+            let rounded_local = slot_local.with_second(0)?.with_nanosecond(0)?;
+
+            let local_date = rounded_local.date_naive();
+            let start_date = start_zurich.date_naive();
+            let end_date = end_zurich.date_naive();
+            if local_date < start_date || local_date >= end_date {
+                return None;
             }
+
+            let floored_utc = rounded_local.with_timezone(&Utc);
+            let slot_end_utc = floored_utc + appointment_duration_chrono;
+
+            tracing::debug!(
+                "🕒 Slot interpreted locally as: {} ({:?})",
+                slot_local,
+                slot_local.weekday()
+            );
+
+            Some(PricedSlot {
+                start_time: floored_utc.to_rfc3339(),
+                end_time: slot_end_utc.to_rfc3339(),
+                duration_minutes: query.duration_minutes,
+                price: price_tier.unit_amount,
+                currency: price_tier.currency.clone().unwrap_or_else(|| {
+                    stripe_config
+                        .default_currency
+                        .clone()
+                        .unwrap_or_else(|| "USD".to_string())
+                }),
+                product_name: price_tier.product_name.clone(),
+            })
         })
         .collect();
 

@@ -33,6 +33,13 @@ mod tests {
         busy_periods
     }
 
+    // Helper function to parse RFC3339 string to DateTime<Utc>
+    fn parse_datetime(datetime_str: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(datetime_str)
+            .expect("Failed to parse RFC3339 datetime")
+            .with_timezone(&Utc)
+    }
+
     proptest! {
         // Test that slots are within working hours
         #[test]
@@ -78,9 +85,12 @@ mod tests {
             );
 
             // Check that all slots are within working hours
-            for slot in &slots {
+            for (start_str, end_str) in &slots {
+                let slot = parse_datetime(start_str);
+                let slot_end = parse_datetime(end_str);
+
                 let slot_time = slot.time();
-                let slot_end_time = (*slot + appointment_duration).time();
+                let slot_end_time = slot_end.time();
 
                 // The slot should start after or at work_start
                 prop_assert!(slot_time >= work_start,
@@ -136,12 +146,13 @@ mod tests {
             );
 
             // Check that no slot overlaps with any busy period
-            for slot in &slots {
-                let slot_end = *slot + appointment_duration;
+            for (start_str, _end_str) in &slots {
+                let slot = parse_datetime(start_str);
+                let slot_end = slot + appointment_duration; // Add duration to get end time
 
                 for (busy_start, busy_end) in &busy_periods {
                     // Check for overlap: (StartA < EndB) and (EndA > StartB)
-                    let overlaps = slot < busy_end && slot_end > *busy_start;
+                    let overlaps = &slot < busy_end && &slot_end > busy_start;
 
                     prop_assert!(!overlaps,
                         "Slot {:?} to {:?} overlaps with busy period {:?} to {:?}",
@@ -193,12 +204,14 @@ mod tests {
 
             // Check that slots are properly spaced
             for i in 1..slots.len() {
-                let time_diff = slots[i] - slots[i-1];
+                let current_slot = parse_datetime(&slots[i].0);
+                let prev_slot = parse_datetime(&slots[i-1].0);
+                let time_diff = current_slot - prev_slot;
 
                 // The difference should be at least the appointment duration plus buffer
                 prop_assert!(time_diff >= appointment_duration + buffer,
                     "Slots should be at least duration + buffer apart: {:?} and {:?}, diff: {:?}, expected: {:?}",
-                    slots[i-1], slots[i], time_diff, appointment_duration + buffer);
+                    prev_slot, current_slot, time_diff, appointment_duration + buffer);
             }
         }
     }

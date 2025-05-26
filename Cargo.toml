@@ -31,6 +31,7 @@ tracing-appender = "0.2"
 # Journald is Linux-only; compile gated with #[cfg]
 tracing-journald = "0.3"
 chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
 utoipa = { version = "5"}
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"]}

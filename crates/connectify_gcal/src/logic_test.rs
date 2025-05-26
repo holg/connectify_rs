@@ -47,8 +47,14 @@ mod tests {
 
             // Check that slots are within working hours
             info!("Slots: {:?}", slots);
-            for slot in &slots {
-                let slot_time = slot.time();
+            for (start_time_str, _) in &slots {
+                // Parse the start time string to a DateTime
+                let start_time_dt = DateTime::parse_from_rfc3339(start_time_str)
+                    .expect("Failed to parse RFC3339 time");
+
+                // Get the time component
+                let slot_time = start_time_dt.time();
+
                 info!(
                     "Slot time: {:?}, work_start: {:?}, work_end: {:?}",
                     slot_time, work_start, work_end
@@ -56,18 +62,27 @@ mod tests {
                 assert!(
                     slot_time >= work_start && slot_time <= work_end,
                     "Slot should be within working hours: {:?}",
-                    slot
+                    start_time_str
                 );
             }
 
             // Check that slots are properly spaced
             for i in 1..slots.len() {
-                let time_diff = slots[i] - slots[i - 1];
+                let (prev_start_str, _) = &slots[i - 1];
+                let (curr_start_str, _) = &slots[i];
+
+                // Parse the start time strings to DateTime objects
+                let prev_start = DateTime::parse_from_rfc3339(prev_start_str)
+                    .expect("Failed to parse RFC3339 time");
+                let curr_start = DateTime::parse_from_rfc3339(curr_start_str)
+                    .expect("Failed to parse RFC3339 time");
+
+                let time_diff = curr_start.signed_duration_since(prev_start);
                 assert!(
                     time_diff >= duration,
                     "Slots should be at least duration apart: {:?} and {:?}",
-                    slots[i - 1],
-                    slots[i]
+                    prev_start_str,
+                    curr_start_str
                 );
             }
         } else {
@@ -127,13 +142,20 @@ mod tests {
             );
 
             // Check that no slot overlaps with the busy period
-            for slot in &slots {
-                let slot_end = *slot + duration;
+            for (start_str, end_str) in &slots {
+                // Parse the start and end time strings to DateTime objects
+                let slot_start =
+                    DateTime::parse_from_rfc3339(start_str).expect("Failed to parse RFC3339 time");
+                let slot_end =
+                    DateTime::parse_from_rfc3339(end_str).expect("Failed to parse RFC3339 time");
+
+                // Simplify the check: ensure slots don't overlap with busy period
                 assert!(
-                    slot_end <= busy_start || *slot >= busy_end,
+                    slot_end.with_timezone(&Utc) <= busy_start
+                        || slot_start.with_timezone(&Utc) >= busy_end,
                     "Slot should not overlap with busy period: {:?} to {:?}",
-                    slot,
-                    slot_end
+                    start_str,
+                    end_str
                 );
             }
         } else {
@@ -189,12 +211,21 @@ mod tests {
 
             // Check that slots are properly spaced with buffer
             for i in 1..slots.len() {
-                let time_diff = slots[i] - slots[i - 1];
+                let (prev_start_str, _) = &slots[i - 1];
+                let (curr_start_str, _) = &slots[i];
+
+                // Parse the start time strings to DateTime objects
+                let prev_start = DateTime::parse_from_rfc3339(prev_start_str)
+                    .expect("Failed to parse RFC3339 time");
+                let curr_start = DateTime::parse_from_rfc3339(curr_start_str)
+                    .expect("Failed to parse RFC3339 time");
+
+                let time_diff = curr_start.signed_duration_since(prev_start);
                 assert!(
                     time_diff >= duration + buffer,
                     "Slots should be at least duration + buffer apart: {:?} and {:?}",
-                    slots[i - 1],
-                    slots[i]
+                    prev_start_str,
+                    curr_start_str
                 );
             }
         } else {
@@ -250,21 +281,27 @@ mod tests {
             );
 
             // Check that all slots start within working hours
-            for slot in &slots {
-                let slot_time = slot.time();
-                let slot_end_time = (*slot + duration).time();
+            for (start_str, end_str) in &slots {
+                // Parse the start and end time strings to DateTime objects
+                let slot_start =
+                    DateTime::parse_from_rfc3339(start_str).expect("Failed to parse RFC3339 time");
+                let slot_end =
+                    DateTime::parse_from_rfc3339(end_str).expect("Failed to parse RFC3339 time");
+
+                let slot_time = slot_start.time();
+                let slot_end_time = slot_end.time();
 
                 assert!(
                     slot_time >= work_start,
                     "Slot should start after work hours begin: {:?}",
-                    slot
+                    start_str
                 );
                 assert!(
                     slot_end_time <= work_end,
                     "Slot should end before work hours end: {:?} + {:?} = {:?}",
-                    slot,
+                    start_str,
                     duration,
-                    *slot + duration
+                    end_str
                 );
             }
         } else {
