@@ -115,7 +115,8 @@ pub async fn get_availability_handler(
 
     // Compute Tz boundaries for the query range
     let start_naive_datetime = start_naive_date.and_hms_opt(0, 0, 0).unwrap();
-    let end_naive_datetime = end_naive_date.and_hms_opt(0, 0, 0).unwrap();
+    // Set end time to end of day (23:59:59) to ensure the time range is not empty
+    let end_naive_datetime = end_naive_date.and_hms_opt(23, 59, 59).unwrap();
     let time_zone = &gcal_config
         .time_zone
         .clone()

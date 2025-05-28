@@ -293,8 +293,11 @@ pub fn calculate_available_slots(
         let end_time_of_day = local_end.time();
 
         // only apply working‐hours/days if not in 24×7 mode
-        if !always_open && (!working_days.contains(&day_of_week)
-                || time_of_day < work_start_time || time_of_day > work_end_time) {
+        if !always_open
+            && (!working_days.contains(&day_of_week)
+                || time_of_day < work_start_time
+                || time_of_day > work_end_time)
+        {
             current_check_time = advance_to_next_working_time(
                 current_check_time + step,
                 work_start_time,

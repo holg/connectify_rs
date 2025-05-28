@@ -8,6 +8,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_send_sms() {
+        // Skip this test if not in production environment
+        if std::env::var("RUN_ENV").unwrap_or_default() != "production" {
+            println!("Skipping test_send_sms in non-production environment");
+            return;
+        }
         // Create a mock config with Twilio settings
         let config = Arc::new(load_config().unwrap());
 
