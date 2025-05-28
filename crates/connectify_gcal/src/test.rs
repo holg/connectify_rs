@@ -5,7 +5,9 @@
 mod tests {
     use crate::service::mock::MockCalendarService;
     use chrono::{DateTime, Duration, Utc};
+    use chrono_tz::Tz;
     use connectify_common::services::{CalendarEvent, CalendarService};
+    use std::str::FromStr;
 
     #[tokio::test]
     async fn test_create_and_get_events() {
@@ -14,9 +16,9 @@ mod tests {
 
         // Create a test calendar ID
         let calendar_id = "test-calendar";
-
+        let tz = Tz::from_str("Europe/Zurich").unwrap();
         // Create a test event
-        let now = Utc::now();
+        let now = Utc::now().with_timezone(&tz);
         let start_time = now + Duration::hours(1);
         let end_time = start_time + Duration::hours(1);
 
@@ -109,7 +111,8 @@ mod tests {
         let calendar_id = "test-calendar";
 
         // Create a test event
-        let now = Utc::now();
+        let time_zone = Tz::from_str("Europe/Zurich").unwrap();
+        let now = Utc::now().with_timezone(&time_zone);
         let start_time = now + Duration::hours(1);
         let end_time = start_time + Duration::hours(1);
 

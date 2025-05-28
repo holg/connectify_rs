@@ -5,7 +5,8 @@
 //! These traits allow for dependency injection and easier testing by decoupling the
 //! application logic from specific implementations of external services.
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 use std::error::Error as StdError;
 use std::fmt;
@@ -51,9 +52,9 @@ pub trait CalendarService: Send + Sync {
     fn get_busy_times(
         &self,
         calendar_id: &str,
-        start_time: DateTime<Utc>,
-        end_time: DateTime<Utc>,
-    ) -> BoxFuture<'_, Vec<(DateTime<Utc>, DateTime<Utc>)>, Self::Error>;
+        start_time: DateTime<Tz>,
+        end_time: DateTime<Tz>,
+    ) -> BoxFuture<'_, Vec<(DateTime<Tz>, DateTime<Tz>)>, Self::Error>;
 
     /// Create a calendar event.
     fn create_event(
@@ -83,8 +84,8 @@ pub trait CalendarService: Send + Sync {
     fn get_booked_events(
         &self,
         calendar_id: &str,
-        start_time: DateTime<Utc>,
-        end_time: DateTime<Utc>,
+        start_time: DateTime<Tz>,
+        end_time: DateTime<Tz>,
         include_cancelled: bool,
     ) -> BoxFuture<'_, Vec<BookedEvent>, Self::Error>;
 }

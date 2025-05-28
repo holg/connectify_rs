@@ -50,7 +50,6 @@ pub struct TokenRequestQuery {
 pub struct TokenResponse {
     pub token: String,
 }
-
 // --- Axum Handler Function ---
 
 /// Generates a Twilio access token for video services using Axum.

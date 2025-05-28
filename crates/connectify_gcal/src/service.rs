@@ -5,6 +5,7 @@
 
 use crate::auth::HubType;
 use chrono::{DateTime, Utc};
+use chrono_tz::Tz;
 use connectify_common::services::{
     BookedEvent, CalendarEvent, CalendarEventResult, CalendarService,
 };
@@ -13,7 +14,7 @@ use google_calendar3::api::{
 };
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
-use tracing::info;
+use tracing::{debug, info};
 
 pub fn extract_payment_metadata(event: &CalendarEvent) -> HashMap<String, String> {
     let mut map = HashMap::new();
@@ -116,24 +117,26 @@ impl CalendarService for GoogleCalendarService {
     fn get_busy_times(
         &self,
         calendar_id: &str,
-        start_time: DateTime<Utc>,
-        end_time: DateTime<Utc>,
+        start_time: DateTime<Tz>,
+        end_time: DateTime<Tz>,
     ) -> std::pin::Pin<
         Box<
-            dyn std::future::Future<
-                    Output = Result<Vec<(DateTime<Utc>, DateTime<Utc>)>, Self::Error>,
-                > + Send
+            dyn std::future::Future<Output = Result<Vec<(DateTime<Tz>, DateTime<Tz>)>, Self::Error>>
+                + Send
                 + '_,
         >,
     > {
         let calendar_id = calendar_id.to_string();
         let calendar_hub = self.calendar_hub.clone();
-
+        let start_time_utc = start_time.with_timezone(&Utc);
+        let end_time_utc = end_time.with_timezone(&Utc);
+        let time_zone = start_time.timezone();
+        // Create a future that resolves to a vector of busy periods for the specified calendar within the given time range
         Box::pin(async move {
             let req = FreeBusyRequest {
-                time_min: Some(start_time),
-                time_max: Some(end_time),
-                time_zone: Some("UTC".to_string()),
+                time_min: Some(start_time_utc),
+                time_max: Some(end_time_utc),
+                time_zone: Some(time_zone.to_string()),
                 items: Some(vec![FreeBusyRequestItem {
                     id: Some(calendar_id.to_string()),
                 }]),
@@ -142,7 +145,7 @@ impl CalendarService for GoogleCalendarService {
 
             // Make the API call
             let (_response, freebusy_response) = calendar_hub.freebusy().query(req).doit().await?;
-
+            debug!("Retrieved busy times: {:?}", _response);
             let mut busy_periods = Vec::new();
 
             // Extract busy periods for the specified calendar
@@ -151,7 +154,9 @@ impl CalendarService for GoogleCalendarService {
                     if let Some(busy_times) = &cal_info.busy {
                         for period in busy_times {
                             if let (Some(start_dt), Some(end_dt)) = (period.start, period.end) {
-                                busy_periods.push((start_dt, end_dt));
+                                let start_tz = start_dt.with_timezone(&time_zone);
+                                let end_tz = end_dt.with_timezone(&time_zone);
+                                busy_periods.push((start_tz, end_tz));
                             } else {
                                 info!(
                                     "Warning: Skipping busy period with missing start/end: {:?}",
@@ -247,7 +252,13 @@ impl CalendarService for GoogleCalendarService {
             }
 
             // Check for conflicts with existing events
-            let busy_times = this.get_busy_times(&calendar_id, start_dt, end_dt).await?;
+            // Convert UTC datetimes to Tz format for get_busy_times
+            let tz = chrono_tz::Tz::UTC;
+            let start_dt_tz = start_dt.with_timezone(&tz);
+            let end_dt_tz = end_dt.with_timezone(&tz);
+            let busy_times = this
+                .get_busy_times(&calendar_id, start_dt_tz, end_dt_tz)
+                .await?;
 
             // If there are any busy periods that overlap with our proposed event time, it's a conflict
             for (busy_start, busy_end) in &busy_times {
@@ -587,22 +598,25 @@ impl CalendarService for GoogleCalendarService {
     fn get_booked_events(
         &self,
         calendar_id: &str,
-        start_time: DateTime<Utc>,
-        end_time: DateTime<Utc>,
+        start_time: DateTime<Tz>,
+        end_time: DateTime<Tz>,
         include_cancelled: bool,
     ) -> std::pin::Pin<
         Box<dyn std::future::Future<Output = Result<Vec<BookedEvent>, Self::Error>> + Send + '_>,
     > {
         let calendar_id = calendar_id.to_string();
         let calendar_hub = self.calendar_hub.clone();
-
+        // let time_zone = start_time.timezone();
         Box::pin(async move {
+            // Import Utc type
+            use chrono::Utc;
+
             // Create the events list request
             let mut request = calendar_hub
                 .events()
                 .list(&calendar_id)
-                .time_min(start_time)
-                .time_max(end_time)
+                .time_min(start_time.with_timezone(&Utc))
+                .time_max(end_time.with_timezone(&Utc))
                 .single_events(true) // Expand recurring events
                 .order_by("startTime"); // Sort by start time
 
@@ -737,17 +751,20 @@ pub mod mock {
         fn get_busy_times(
             &self,
             calendar_id: &str,
-            start_time: DateTime<Utc>,
-            end_time: DateTime<Utc>,
+            start_time: DateTime<Tz>,
+            end_time: DateTime<Tz>,
         ) -> std::pin::Pin<
             Box<
                 dyn std::future::Future<
-                        Output = Result<Vec<(DateTime<Utc>, DateTime<Utc>)>, Self::Error>,
+                        Output = Result<Vec<(DateTime<Tz>, DateTime<Tz>)>, Self::Error>,
                     > + Send
                     + '_,
             >,
         > {
+            let time_zone = start_time.timezone();
             let calendar_id = calendar_id.to_string();
+            // let start_time_tz = start_time.with_timezone(&time_zone);
+            // let end_time_tz = end_time.with_timezone(&time_zone);
 
             Box::pin(async move {
                 let events = self.events.lock().unwrap();
@@ -761,10 +778,10 @@ pub mod mock {
 
                     let event_start = DateTime::parse_from_rfc3339(&event.start_time)
                         .map_err(|e| GcalServiceError::TimeParseError(e.to_string()))?
-                        .with_timezone(&Utc);
+                        .with_timezone(&time_zone);
                     let event_end = DateTime::parse_from_rfc3339(&event.end_time)
                         .map_err(|e| GcalServiceError::TimeParseError(e.to_string()))?
-                        .with_timezone(&Utc);
+                        .with_timezone(&time_zone);
 
                     if event_start < end_time && event_end > start_time {
                         busy_times.push((event_start, event_end));
@@ -806,12 +823,11 @@ pub mod mock {
                 }
 
                 // Check for conflicts
+                let tz = chrono_tz::Tz::UTC;
+                let start_dt_tz = start_dt.with_timezone(&tz);
+                let end_dt_tz = end_dt.with_timezone(&tz);
                 let busy_times = self
-                    .get_busy_times(
-                        &calendar_id,
-                        start_dt.with_timezone(&Utc),
-                        end_dt.with_timezone(&Utc),
-                    )
+                    .get_busy_times(&calendar_id, start_dt_tz, end_dt_tz)
                     .await?;
 
                 for (busy_start, busy_end) in &busy_times {
@@ -897,8 +913,8 @@ pub mod mock {
         fn get_booked_events(
             &self,
             calendar_id: &str,
-            start_time: DateTime<Utc>,
-            end_time: DateTime<Utc>,
+            start_time: DateTime<Tz>,
+            end_time: DateTime<Tz>,
             include_cancelled: bool,
         ) -> std::pin::Pin<
             Box<

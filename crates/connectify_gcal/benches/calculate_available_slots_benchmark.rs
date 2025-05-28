@@ -1,23 +1,22 @@
 use chrono::{DateTime, Duration, NaiveTime, Utc, Weekday};
+use chrono_tz::Tz;
 use connectify_gcal::logic::calculate_available_slots;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 // Helper function to create a valid time range
-fn create_time_range(
-    start_offset_hours: i64,
-    duration_days: i64,
-) -> (DateTime<Utc>, DateTime<Utc>) {
-    let start = Utc::now() + Duration::hours(start_offset_hours);
+fn create_time_range(start_offset_hours: i64, duration_days: i64) -> (DateTime<Tz>, DateTime<Tz>) {
+    let time_zone = Tz::Europe__Zurich;
+    let start = Utc::now().with_timezone(&time_zone) + Duration::hours(start_offset_hours);
     let end = start + Duration::days(duration_days);
     (start, end)
 }
 
 // Helper function to create a list of busy periods
 fn create_busy_periods(
-    base_time: DateTime<Utc>,
+    base_time: DateTime<Tz>,
     count: usize,
     max_duration_hours: i64,
-) -> Vec<(DateTime<Utc>, DateTime<Utc>)> {
+) -> Vec<(DateTime<Tz>, DateTime<Tz>)> {
     let mut busy_periods = Vec::new();
     let mut current_time = base_time;
 
@@ -84,7 +83,6 @@ fn benchmark_calculate_available_slots(c: &mut Criterion) {
             ];
             let buffer = Duration::minutes(0);
             let step = Duration::minutes(15);
-
             calculate_available_slots(
                 black_box(start),
                 black_box(end),

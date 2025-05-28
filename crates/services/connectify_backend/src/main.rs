@@ -12,12 +12,6 @@ use tracing::{debug, info, warn}; // we shall add more warns, even so now only s
 // Import the AppState and AppStateBuilder from the app_state module
 mod app_state;
 use app_state::AppState;
-
-// #[axum::debug_handler]
-// async fn show_config(State(config): State<Arc<AppConfig>>) -> Json<AppConfig> {
-//     Json(config.as_ref().clone())
-// }
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging with default level (INFO)
@@ -38,9 +32,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_state = AppState::new(config.clone()).await;
     #[allow(unused_mut)]
     let mut api_router =
-        Router::new().route("/", get(|| async { "Welcome to Connectify-Rs API!" }));
-    // .route("/config", get(show_config))
-    // .with_state(config.clone()); we manage the State now with app_state
+        Router::new().route("/api", get(|| async { "Welcome to Connectify-Rs API!" }));
+
     // Conditionally merge Twilio routes
     #[cfg(feature = "twilio")]
     {

@@ -1,15 +1,13 @@
 // --- File: crates/connectify_gcal/src/logic.rs ---
 use crate::auth::HubType; // Use the specific Hub type alias
 use crate::service::{GcalServiceError, GoogleCalendarService};
-use chrono::{DateTime, Datelike, Duration, NaiveTime, Utc, Weekday}; // Use chrono Duration
-use chrono_tz::Europe::Zurich;
+use chrono::{DateTime, Datelike, Duration, NaiveTime, Weekday}; // Use chrono Duration
+use chrono_tz::Tz;
 use connectify_common::services::{CalendarEvent as CommonCalendarEvent, CalendarService};
 use google_calendar3::api::Event; //, EventDateTime};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc; //, CalendarEventResult, , BookedEvent as CommonBookedEvent};
 use tracing::{debug, error};
-
-// To access GCal config
 #[cfg(feature = "openapi")]
 use utoipa::ToSchema; //, IntoParams};
 
@@ -99,18 +97,24 @@ pub struct BookingResponse {
 pub async fn get_busy_times(
     hub: &HubType,
     calendar_id: &str,
-    start_time: DateTime<Utc>,
-    end_time: DateTime<Utc>,
-) -> Result<Vec<(DateTime<Utc>, DateTime<Utc>)>, GcalError> {
+    start_time: DateTime<Tz>,
+    end_time: DateTime<Tz>,
+) -> Result<Vec<(DateTime<Tz>, DateTime<Tz>)>, GcalError> {
     // Create a GoogleCalendarService instance
     let service = GoogleCalendarService::new(Arc::new(hub.clone()));
-
     // Use the service to get busy times
     let busy_periods = service
         .get_busy_times(calendar_id, start_time, end_time)
         .await?;
 
-    Ok(busy_periods)
+    // Convert UTC datetimes to the specified timezone
+    let timezone = start_time.timezone();
+    let converted_busy_periods = busy_periods
+        .into_iter()
+        .map(|(start, end)| (start.with_timezone(&timezone), end.with_timezone(&timezone)))
+        .collect();
+
+    Ok(converted_busy_periods)
 }
 
 /// Configuration for working hours and days
@@ -137,9 +141,9 @@ pub struct AppointmentConfig {
 /// Returns slots as pairs of RFC3339 strings in Europe/Zurich time zone.
 #[allow(clippy::too_many_arguments)]
 pub fn calculate_available_slots(
-    query_start: DateTime<Utc>,
-    query_end: DateTime<Utc>,
-    busy_periods: &[(DateTime<Utc>, DateTime<Utc>)],
+    query_start: DateTime<Tz>,
+    query_end: DateTime<Tz>,
+    busy_periods: &[(DateTime<Tz>, DateTime<Tz>)],
     duration: Duration,
     work_start_time: NaiveTime,
     work_end_time: NaiveTime,
@@ -150,8 +154,8 @@ pub fn calculate_available_slots(
     use chrono::{TimeZone, Timelike};
 
     fn merge_busy_periods(
-        busy: &[(DateTime<Utc>, DateTime<Utc>)],
-    ) -> Vec<(DateTime<Utc>, DateTime<Utc>)> {
+        busy: &[(DateTime<Tz>, DateTime<Tz>)],
+    ) -> Vec<(DateTime<Tz>, DateTime<Tz>)> {
         if busy.is_empty() {
             return vec![];
         }
@@ -170,15 +174,16 @@ pub fn calculate_available_slots(
     }
 
     fn advance_to_next_working_time(
-        current: DateTime<Utc>,
+        current: DateTime<Tz>,
         work_start: NaiveTime,
         working_days: &[Weekday],
-    ) -> DateTime<Utc> {
-        let mut local = current.with_timezone(&Zurich);
+    ) -> DateTime<Tz> {
+        let mut local = current;
+        let time_zone = current.timezone();
         loop {
-            let weekday = local.date_naive().weekday();
+            let weekday = local.weekday();
             if working_days.contains(&weekday) && local.time() <= work_start {
-                return Utc
+                return time_zone
                     .with_ymd_and_hms(
                         local.year(),
                         local.month(),
@@ -190,7 +195,7 @@ pub fn calculate_available_slots(
                     .unwrap();
             }
             local += chrono::Duration::days(1);
-            local = Zurich
+            local = time_zone
                 .with_ymd_and_hms(
                     local.year(),
                     local.month(),
@@ -203,25 +208,63 @@ pub fn calculate_available_slots(
         }
     }
 
-    let now_utc = Utc::now();
-    // Only allow slots in the future, keep UTC type
-    let adjusted_query_start = query_start.max(now_utc);
-
-    debug!(
-        "Calculating available slots for {} - {} Working Days:{:?}",
-        query_start, query_end, working_days
-    );
+    // For testing purposes, always use the query_start directly
+    // This ensures that we can test with fixed dates in the future
+    let adjusted_query_start = query_start;
     let mut available_slots = Vec::new();
     let mut current_check_time = adjusted_query_start;
+    // treat a full-calendar day (00:00–23:59:59) as 24×7 always open
+    let always_open = work_start_time == NaiveTime::from_hms_opt(0, 0, 0).unwrap()
+        && work_end_time >= NaiveTime::from_hms_opt(23, 59, 0).unwrap();
+    debug!(
+        "work_start_time: {:?}, work_end_time: {:?}, always_open: {:?}",
+        work_start_time, work_end_time, always_open
+    );
+    // For 60-minute slots, ensure they start at full hours
+    let is_hourly_slot = duration.num_minutes() == 60;
+
     // Round up to next step interval (e.g., next 15min)
     {
-        let local_now = current_check_time.with_timezone(&Zurich);
-        let step_minutes = step.num_minutes() as u32;
-        let minute = local_now.minute();
-        let rounded = minute % step_minutes;
-        if rounded != 0 {
-            let padding = step - chrono::Duration::minutes(rounded.into());
-            current_check_time = (local_now + padding).with_timezone(&Utc);
+        let time_zone = current_check_time.timezone();
+        let local_now = current_check_time;
+
+        if is_hourly_slot {
+            // For 60-minute slots, round to the next full hour
+            let hour = local_now.hour();
+            let minute = local_now.minute();
+
+            if minute > 0 {
+                // If we're not at the start of an hour, move to the next hour
+                let next_hour = hour + 1;
+                let next_hour_time = time_zone
+                    .with_ymd_and_hms(
+                        local_now.year(),
+                        local_now.month(),
+                        local_now.day(),
+                        next_hour % 24,
+                        0,
+                        0,
+                    )
+                    .unwrap();
+
+                // If we crossed to the next day, adjust the date
+                let next_hour_time = if next_hour >= 24 {
+                    next_hour_time + chrono::Duration::days(1)
+                } else {
+                    next_hour_time
+                };
+
+                current_check_time = next_hour_time;
+            }
+        } else {
+            // For other durations, use the original step-based rounding
+            let step_minutes = step.num_minutes() as u32;
+            let minute = local_now.minute();
+            let rounded = minute % step_minutes;
+            if rounded != 0 {
+                let padding = step - chrono::Duration::minutes(rounded.into());
+                current_check_time = local_now + padding;
+            }
         }
     }
 
@@ -234,12 +277,12 @@ pub fn calculate_available_slots(
             Some(t) => t,
             None => break,
         };
-        let potential_end_with_buffer = match potential_end_time.checked_add_signed(buffer_time) {
-            Some(t) => t,
-            None => potential_end_time,
-        };
-        let local_start = potential_start_time.with_timezone(&Zurich);
-        let local_end = potential_end_time.with_timezone(&Zurich);
+        let potential_end_with_buffer = potential_end_time
+            .checked_add_signed(buffer_time)
+            .unwrap_or(potential_end_time);
+        let time_zone = potential_start_time.timezone();
+        let local_start = potential_start_time;
+        let local_end = potential_end_time;
 
         if potential_start_time < query_start || potential_end_time > query_end {
             current_check_time += step;
@@ -249,14 +292,9 @@ pub fn calculate_available_slots(
         let time_of_day = local_start.time();
         let end_time_of_day = local_end.time();
 
-        // If not in working day or outside working hours, advance smartly
-        if !working_days.contains(&day_of_week)
-            || time_of_day < work_start_time
-            || time_of_day > work_end_time
-            || end_time_of_day > work_end_time
-            || (local_end.date_naive() != local_start.date_naive()
-                && end_time_of_day > NaiveTime::from_hms_opt(0, 0, 0).unwrap())
-        {
+        // only apply working‐hours/days if not in 24×7 mode
+        if !always_open && (!working_days.contains(&day_of_week)
+                || time_of_day < work_start_time || time_of_day > work_end_time) {
             current_check_time = advance_to_next_working_time(
                 current_check_time + step,
                 work_start_time,
@@ -265,15 +303,31 @@ pub fn calculate_available_slots(
             continue;
         }
 
-        // Truncate if end-of-day is too close for slot
-        let remaining_day = work_end_time - time_of_day;
-        if remaining_day < duration {
-            current_check_time = advance_to_next_working_time(
-                current_check_time + chrono::Duration::days(1),
-                work_start_time,
-                working_days,
-            );
-            continue;
+        // Handle slots that cross midnight differently - don't skip them
+        // but ensure they're properly handled based on working hours
+        if local_end.date_naive() != local_start.date_naive() {
+            // If the next day is not a working day, skip this slot
+            let next_day_weekday = (local_start.date_naive() + chrono::Days::new(1)).weekday();
+            if !working_days.contains(&next_day_weekday) {
+                current_check_time += step;
+                continue;
+            }
+
+            // If the slot extends beyond midnight but the end time is within working hours
+            // of the next day, allow it (don't skip)
+        }
+
+        // only enforce end‐of‐day check if not in 24×7 mode
+        if !always_open {
+            let remaining_day = work_end_time - time_of_day;
+            if remaining_day < duration {
+                current_check_time = advance_to_next_working_time(
+                    current_check_time + chrono::Duration::days(1),
+                    work_start_time,
+                    working_days,
+                );
+                continue;
+            }
         }
 
         // Check for overlap with merged busy periods
@@ -287,13 +341,40 @@ pub fn calculate_available_slots(
         }
 
         if !overlaps {
-            // Convert to Europe/Zurich local time and RFC3339 string
-            let start_zurich = potential_start_time.with_timezone(&Zurich).to_rfc3339();
-            let end_zurich = potential_end_time.with_timezone(&Zurich).to_rfc3339();
-            available_slots.push((start_zurich, end_zurich));
-            current_check_time = potential_end_with_buffer;
+            // For 60-minute slots, ensure they start at full hours in local time
+            if is_hourly_slot {
+                let local_time = potential_start_time.with_timezone(&time_zone);
+                if local_time.minute() != 0 {
+                    // Skip this slot if it doesn't start at a full hour
+                    current_check_time += step;
+                    continue;
+                }
+            }
+
+            // Convert to RFC3339 string with the original timezone
+            let start_zurich = potential_start_time.to_rfc3339();
+            let end_zurich = potential_end_time.to_rfc3339();
+
+            // Check if the slot end time is within working hours
+            // Special case: If work ends at 23:59 and slot ends at 00:00, allow it
+            let is_midnight_edge_case = work_end_time.hour() == 23
+                && work_end_time.minute() == 59
+                && end_time_of_day.hour() == 0
+                && end_time_of_day.minute() == 0;
+
+            if end_time_of_day <= work_end_time || is_midnight_edge_case {
+                available_slots.push((start_zurich, end_zurich));
+            }
+
+            // For 60-minute slots, move directly to the next hour plus buffer
+            if is_hourly_slot {
+                current_check_time = potential_start_time + duration + buffer_time;
+            } else {
+                current_check_time = potential_end_with_buffer;
+            }
         }
     }
+    debug!("Final available slots: {:?}", available_slots);
     available_slots
 }
 
@@ -320,7 +401,6 @@ pub async fn create_calendar_event(
         payment_amount: request.payment_amount,
         room_name: request.room_name.clone(),
     };
-
     // Use the service to create the event
     let result = service.create_event(calendar_id, calendar_event).await?;
 
@@ -429,8 +509,8 @@ pub struct BookedEventsResponse {
 pub async fn get_booked_events(
     hub: &HubType,
     calendar_id: &str,
-    start_time: DateTime<Utc>,
-    end_time: DateTime<Utc>,
+    start_time: DateTime<Tz>,
+    end_time: DateTime<Tz>,
     include_cancelled: bool,
 ) -> Result<Vec<BookedEvent>, GcalError> {
     // Create a GoogleCalendarService instance

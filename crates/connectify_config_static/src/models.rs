@@ -1,7 +1,6 @@
 // --- File: crates/connectify_config/src/models.rs ---
 
 use serde::{Deserialize, Serialize};
-
 // #[cfg(feature = "openapi")]
 // use utoipa::{ToSchema, PartialSchema}; // , IntoParams};
 // --- General Server Config ---
@@ -27,7 +26,9 @@ pub struct TwilioConfig {
     pub account_sid: String, // Loaded via TWILIO_ACCOUNT_SID
     pub api_key_sid: String, // Loaded via TWILIO_API_KEY_SID
     pub api_key_secret: String,
-    // Secret loaded directly from env var: TWILIO_API_KEY_SECRET
+    pub auth_token: String, // Loaded via TWILIO_AUTH_TOKEN
+    pub phone_number: String, // Loaded via TWILIO_PHONE_NUMBER
+                            // Secret loaded directly from env var: TWILIO_API_KEY_SECRET
 }
 
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -107,6 +108,11 @@ pub struct GcalConfig {
     pub key_path: Option<String>,        // Mandatory
     pub calendar_id: Option<String>,     // Mandatory
     pub time_slot_duration: Option<u16>, // In minutes
+    pub preparation_time_minutes: Option<i64>,
+    pub time_zone: Option<String>,         // Time zone for the calendar
+    pub working_days: Option<Vec<String>>, // Working days of the week
+    pub work_start_time: Option<String>,   // Start time of the working day
+    pub work_end_time: Option<String>,     // End time of the working day
 }
 
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

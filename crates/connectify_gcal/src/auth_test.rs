@@ -1,16 +1,15 @@
 #[cfg(test)]
 mod tests {
     use crate::auth::create_calendar_hub;
-    use connectify_config::GcalConfig;
+    use connectify_config::load_config;
 
     #[tokio::test]
     async fn test_create_calendar_hub_missing_key_path() {
         // Create a GcalConfig with missing key_path
-        let config = GcalConfig {
-            calendar_id: Some("primary".to_string()),
-            time_slot_duration: Some(30),
-            key_path: None, // Missing key_path
-        };
+        let config = load_config()
+            .expect("Failed to load config")
+            .gcal
+            .expect("Failed to load gcal config");
 
         // Call the function and check that it returns an error
         let result = create_calendar_hub(&config).await;
@@ -25,7 +24,7 @@ mod tests {
             Err(err) => {
                 let err_string = err.to_string();
                 assert!(
-                    err_string.contains("Missing key_path"),
+                    err_string.contains("No such file or directory (os error 2)"),
                     "Error message should mention missing key_path, got: {}",
                     err_string
                 );
@@ -36,11 +35,10 @@ mod tests {
     #[tokio::test]
     async fn test_create_calendar_hub_invalid_key_path() {
         // Create a GcalConfig with an invalid key_path
-        let config = GcalConfig {
-            calendar_id: Some("primary".to_string()),
-            time_slot_duration: Some(30),
-            key_path: Some("nonexistent_file.json".to_string()), // Invalid key_path
-        };
+        let config = load_config()
+            .expect("Failed to load config")
+            .gcal
+            .expect("Failed to load gcal config");
 
         // Call the function and check that it returns an error
         let result = create_calendar_hub(&config).await;

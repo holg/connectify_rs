@@ -52,6 +52,7 @@ connectify-stripe = { path = "../../connectify_stripe", optional = true }
 connectify-fulfillment = { path = "../../connectify_fulfillment", optional = true }
 connectify-adhoc = { path = "../../connectify_adhoc", optional = true }
 chrono = { workspace = true }
+chrono-tz = { workspace = true }
 utoipa = { workspace = true, optional = true }
 utoipa-swagger-ui = { workspace = true, optional = true }
 #[dev-dependencies]

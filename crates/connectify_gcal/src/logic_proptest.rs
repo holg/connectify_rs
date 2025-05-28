@@ -2,26 +2,29 @@
 mod tests {
     use crate::logic::calculate_available_slots;
     use chrono::{DateTime, Duration, NaiveTime, Utc, Weekday};
+    use chrono_tz::Tz;
     use proptest::prelude::*;
 
     // Helper function to create a valid time range
     fn create_time_range(
         start_offset_hours: i64,
         duration_days: i64,
-    ) -> (DateTime<Utc>, DateTime<Utc>) {
-        let start = Utc::now() + Duration::hours(start_offset_hours);
+    ) -> (DateTime<Tz>, DateTime<Tz>) {
+        let time_zone = Tz::Europe__Zurich;
+        let start = Utc::now().with_timezone(&time_zone) + Duration::hours(start_offset_hours);
         let end = start + Duration::days(duration_days);
         (start, end)
     }
 
     // Helper function to create a list of busy periods
     fn create_busy_periods(
-        base_time: DateTime<Utc>,
+        base_time: DateTime<Tz>,
         count: usize,
         max_duration_hours: i64,
-    ) -> Vec<(DateTime<Utc>, DateTime<Utc>)> {
+    ) -> Vec<(DateTime<Tz>, DateTime<Tz>)> {
+        let time_zone = Tz::Europe__Zurich;
         let mut busy_periods = Vec::new();
-        let mut current_time = base_time;
+        let mut current_time = base_time.with_timezone(&time_zone);
 
         for _ in 0..count {
             let start = current_time + Duration::hours(1);
@@ -83,11 +86,11 @@ mod tests {
                 Duration::minutes(0), // No buffer
                 Duration::minutes(15), // 15-minute step
             );
-
+            let time_zone = Tz::Europe__Zurich;
             // Check that all slots are within working hours
             for (start_str, end_str) in &slots {
-                let slot = parse_datetime(start_str);
-                let slot_end = parse_datetime(end_str);
+                let slot = parse_datetime(start_str).with_timezone(&time_zone);
+                let slot_end = parse_datetime(end_str).with_timezone(&time_zone);
 
                 let slot_time = slot.time();
                 let slot_end_time = slot_end.time();

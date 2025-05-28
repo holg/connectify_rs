@@ -1,6 +1,8 @@
 // --- File: crates/connectify_adhoc/src/logic.rs ---
 
 use chrono::{Duration, Utc};
+#[allow(unused_imports)]
+use chrono_tz::Tz;
 use connectify_config::AppConfig; //, StripeConfig, GcalConfig, PriceTier, AdhocSessionSettings};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -139,12 +141,19 @@ pub async fn initiate_adhoc_session_logic(
                 hub_instance
             }
         };
+        // Check if the requested time slot is available in GCal
+        let timezone = gcal_config
+            .time_zone
+            .as_ref()
+            .ok_or_else(|| AdhocSessionError::ConfigError("GCal timezone missing.".to_string()))?
+            .parse::<Tz>()
+            .map_err(|_| AdhocSessionError::ConfigError("Invalid timezone format.".to_string()))?;
 
         let busy_times = gcal_get_busy_times(
             &hub_to_use,
             calendar_id,
-            effective_start_time,
-            effective_end_time,
+            effective_start_time.with_timezone(&timezone),
+            effective_end_time.with_timezone(&timezone),
         )
         .await?;
 

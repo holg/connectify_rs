@@ -451,6 +451,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
+ "chrono-tz",
  "connectify-common",
  "connectify-config",
  "connectify-gcal",
@@ -470,6 +471,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
+ "chrono-tz",
  "connectify-adhoc",
  "connectify-common",
  "connectify-config",
@@ -494,6 +496,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
+ "chrono-tz",
  "connectify-config",
  "once_cell",
  "reqwest",
@@ -648,6 +651,7 @@ dependencies = [
  "reqwest",
  "serde",
  "thiserror 2.0.12",
+ "tokio",
  "tracing",
  "utoipa",
  "utoipa-swagger-ui",

@@ -90,6 +90,17 @@ pub fn create_mock_config() -> Arc<AppConfig> {
         calendar_id: Some("primary".to_string()),
         time_slot_duration: Some(30),
         key_path: Some("test_key.json".to_string()),
+        preparation_time_minutes: Some(120),
+        time_zone: Some("Europe/Zurich".to_string()),
+        working_days: Some(vec![
+            "Mon".to_string(),
+            "Tue".to_string(),
+            "Wed".to_string(),
+            "Thu".to_string(),
+            "Fri".to_string(),
+        ]),
+        work_start_time: Some("09:00".to_string()),
+        work_end_time: Some("17:00".to_string()),
     };
 
     // Create and return the AppConfig

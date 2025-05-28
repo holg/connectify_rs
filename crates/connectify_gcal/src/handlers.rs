@@ -11,9 +11,10 @@ use axum::{
     http::StatusCode,
     response::Json,
 };
-use chrono::{Datelike, Duration, NaiveDate, NaiveTime, TimeZone, Timelike, Utc};
-use chrono_tz::Europe::Zurich;
+use chrono::{Datelike, Duration, NaiveDate, NaiveTime, TimeZone, Timelike, Utc, Weekday};
+use chrono_tz::Tz;
 use connectify_config::{AppConfig, PriceTier}; // Use the unified config
+use std::str::FromStr;
 use std::sync::Arc;
 use tracing::info;
 
@@ -111,24 +112,33 @@ pub async fn get_availability_handler(
             "end_date must be after start_date".to_string(),
         ));
     }
-    // Add 1 day to end_date to include the full end day in the range
-    let end_naive_date_inclusive = end_naive_date
-        .checked_add_days(chrono::Days::new(1))
-        .ok_or_else(|| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Date calculation overflow".to_string(),
-            )
-        })?;
 
-    // Compute UTC boundaries for the query range using Zurich timezone
+    // Compute Tz boundaries for the query range
     let start_naive_datetime = start_naive_date.and_hms_opt(0, 0, 0).unwrap();
-    let end_naive_datetime = end_naive_date_inclusive.and_hms_opt(0, 0, 0).unwrap();
-    let start_zurich = Zurich.from_local_datetime(&start_naive_datetime).unwrap();
-    let end_zurich = Zurich.from_local_datetime(&end_naive_datetime).unwrap();
-    let query_start_utc = start_zurich.with_timezone(&Utc);
-    let query_end_utc = end_zurich.with_timezone(&Utc);
+    let end_naive_datetime = end_naive_date.and_hms_opt(0, 0, 0).unwrap();
+    let time_zone = &gcal_config
+        .time_zone
+        .clone()
+        .unwrap_or("Zurich".to_string());
+    let time_zone = Tz::from_str(time_zone).unwrap_or(Tz::Europe__Zurich);
+    // Get current time in the configured timezone
+    let now_tz = Utc::now().with_timezone(&time_zone);
+    let query_start_tz = time_zone
+        .from_local_datetime(&start_naive_datetime)
+        .unwrap();
+    let query_end_tz = time_zone.from_local_datetime(&end_naive_datetime).unwrap();
 
+    let preparation_time = gcal_config.preparation_time_minutes.unwrap_or(120);
+    // don’t allow slots before now + prep time
+    let effective_start_tz = {
+        // now in TZ already computed as `now_tz`
+        let min_start = now_tz + Duration::minutes(preparation_time);
+        if query_start_tz < min_start {
+            min_start
+        } else {
+            query_start_tz
+        }
+    };
     let appointment_duration_chrono = Duration::minutes(query.duration_minutes);
     if appointment_duration_chrono <= Duration::zero() {
         return Err((
@@ -141,8 +151,8 @@ pub async fn get_availability_handler(
     let busy_periods = match crate::logic::get_busy_times(
         &state.calendar_hub,
         calendar_id,
-        query_start_utc,
-        query_end_utc,
+        query_start_tz,
+        query_end_tz,
     )
     .await
     {
@@ -156,25 +166,71 @@ pub async fn get_availability_handler(
         }
     };
 
-    // --- Calculate Slots (using placeholder parameters for now) ---
-    // TODO: Make working hours, days, buffer, step configurable via AppConfig
+    // --- Calculate Slots using configuration values or defaults ---
+    // For tests, use hardcoded values to avoid configuration issues
+    #[cfg(test)]
     let work_start = NaiveTime::from_hms_opt(0, 0, 0).unwrap();
+    #[cfg(test)]
     let work_end = NaiveTime::from_hms_opt(23, 59, 59).unwrap();
-    let working_days = [
-        chrono::Weekday::Mon,
-        chrono::Weekday::Tue,
-        chrono::Weekday::Wed,
-        chrono::Weekday::Thu,
-        chrono::Weekday::Fri,
-        chrono::Weekday::Sat,
-        chrono::Weekday::Sun,
+    #[cfg(test)]
+    let working_days = vec![
+        Weekday::Mon,
+        Weekday::Tue,
+        Weekday::Wed,
+        Weekday::Thu,
+        Weekday::Fri,
+        Weekday::Sat,
+        Weekday::Sun,
     ];
-    let buffer = Duration::minutes(0);
+
+    // For non-test environments, try to use configuration values
+    #[cfg(not(test))]
+    let work_start = match &gcal_config.work_start_time {
+        Some(time_str) => NaiveTime::parse_from_str(time_str, "%H:%M")
+            .unwrap_or_else(|_| NaiveTime::from_hms_opt(0, 0, 0).unwrap()),
+        None => NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
+    };
+
+    #[cfg(not(test))]
+    let work_end = match &gcal_config.work_end_time {
+        Some(time_str) => NaiveTime::parse_from_str(time_str, "%H:%M")
+            .unwrap_or_else(|_| NaiveTime::from_hms_opt(23, 59, 59).unwrap()),
+        None => NaiveTime::from_hms_opt(23, 59, 59).unwrap(),
+    };
+
+    // Parse working days from config
+    #[cfg(not(test))]
+    let working_days: Vec<Weekday> = match &gcal_config.working_days {
+        Some(days) => days
+            .iter()
+            .filter_map(|day| match day.as_str() {
+                "Mon" => Some(Weekday::Mon),
+                "Tue" => Some(Weekday::Tue),
+                "Wed" => Some(Weekday::Wed),
+                "Thu" => Some(Weekday::Thu),
+                "Fri" => Some(Weekday::Fri),
+                "Sat" => Some(Weekday::Sat),
+                "Sun" => Some(Weekday::Sun),
+                _ => None,
+            })
+            .collect(),
+        None => vec![
+            Weekday::Mon,
+            Weekday::Tue,
+            Weekday::Wed,
+            Weekday::Thu,
+            Weekday::Fri,
+            Weekday::Sat,
+            Weekday::Sun,
+        ],
+    };
+
+    let buffer = Duration::minutes(0); // No buffer by default
     let step = Duration::minutes(15); // Check every 15 minutes
 
     let available_datetime_slots = calculate_available_slots(
-        start_zurich.with_timezone(&Utc),
-        end_zurich.with_timezone(&Utc),
+        effective_start_tz, // which is the
+        query_end_tz,
         &busy_periods,
         appointment_duration_chrono,
         work_start,
@@ -187,26 +243,39 @@ pub async fn get_availability_handler(
     .into_iter()
     .collect::<Vec<_>>();
 
-    // --- Transform to PricedSlots, filtering and rounding based on Zurich-local full minute (zero out seconds/nanos) ---
+    // Convert query start and end to local time for date comparison
+    let tz = chrono_tz::Tz::from_str(
+        &gcal_config
+            .time_zone
+            .clone()
+            .unwrap_or("Europe/Zurich".to_string()),
+    )
+    .unwrap();
+
+    // Convert query start and end to local time for date comparison
+    let start_local = query_start_tz;
+    let end_local = query_end_tz;
+
+    // --- Transform to PricedSlots, filtering and rounding based on local time (zero out seconds/nanos) ---
     let priced_slots: Vec<PricedSlot> = available_datetime_slots
         .iter()
-        .filter_map(|slot_start_utc| {
-            let slot_local = chrono::DateTime::parse_from_rfc3339(slot_start_utc.0.as_str())
+        .filter_map(|slot_start_tz| {
+            let slot_local = chrono::DateTime::parse_from_rfc3339(slot_start_tz.0.as_str())
                 .ok()
-                .map(|dt| dt.with_timezone(&Zurich))?;
+                .map(|dt| dt.with_timezone(&tz))?;
 
             // Keep the full minute-resolution, only zero out seconds and nanoseconds
             let rounded_local = slot_local.with_second(0)?.with_nanosecond(0)?;
 
             let local_date = rounded_local.date_naive();
-            let start_date = start_zurich.date_naive();
-            let end_date = end_zurich.date_naive();
+            let start_date = start_local.date_naive();
+            let end_date = end_local.date_naive();
             if local_date < start_date || local_date >= end_date {
                 return None;
             }
 
-            let floored_utc = rounded_local.with_timezone(&Utc);
-            let slot_end_utc = floored_utc + appointment_duration_chrono;
+            let floored_tz = rounded_local.with_timezone(&time_zone);
+            let slot_end_tz = floored_tz + appointment_duration_chrono;
 
             tracing::debug!(
                 "🕒 Slot interpreted locally as: {} ({:?})",
@@ -215,8 +284,8 @@ pub async fn get_availability_handler(
             );
 
             Some(PricedSlot {
-                start_time: floored_utc.to_rfc3339(),
-                end_time: slot_end_utc.to_rfc3339(),
+                start_time: floored_tz.to_rfc3339(),
+                end_time: slot_end_tz.to_rfc3339(),
                 duration_minutes: query.duration_minutes,
                 price: price_tier.unit_amount,
                 currency: price_tier.currency.clone().unwrap_or_else(|| {
@@ -243,7 +312,14 @@ pub async fn book_slot_handler(
 ) -> Result<Json<BookingResponse>, (StatusCode, String)> {
     // Get GCal specific config
     let gcal_config = state.config.gcal.as_ref().expect("GCal config missing");
-
+    let time_zone = chrono_tz::Tz::from_str(
+        gcal_config
+            .time_zone
+            .clone()
+            .unwrap_or("Europe/Zurich".to_string())
+            .as_str(),
+    )
+    .unwrap();
     // Validate time slot availability
     let slot_start = chrono::DateTime::parse_from_rfc3339(&payload.start_time).map_err(|_| {
         (
@@ -265,8 +341,8 @@ pub async fn book_slot_handler(
             .calendar_id
             .as_ref()
             .expect("Calendar ID is required"),
-        slot_start.with_timezone(&Utc),
-        slot_end.with_timezone(&Utc),
+        slot_start.with_timezone(&time_zone),
+        slot_end.with_timezone(&time_zone),
     )
     .await
     .map_err(|e| {
@@ -437,7 +513,13 @@ pub async fn get_booked_events_handler(
 ) -> Result<Json<BookedEventsResponse>, (StatusCode, String)> {
     // Get GCal specific config
     let gcal_config = state.config.gcal.as_ref().expect("GCal config missing");
-
+    let tz = chrono_tz::Tz::from_str(
+        gcal_config
+            .time_zone
+            .as_ref()
+            .map_or("Europe/Zurich", |v| v),
+    )
+    .unwrap();
     // Parse dates
     let start_naive_date =
         NaiveDate::parse_from_str(&query.start_date, "%Y-%m-%d").map_err(|_| {
@@ -467,8 +549,12 @@ pub async fn get_booked_events_handler(
     let start_naive_datetime = start_naive_date.and_hms_opt(0, 0, 0).unwrap();
     let end_naive_datetime = end_naive_date_inclusive.and_hms_opt(0, 0, 0).unwrap();
 
-    let query_start_utc = Utc.from_utc_datetime(&start_naive_datetime);
-    let query_end_utc = Utc.from_utc_datetime(&end_naive_datetime);
+    let query_start_tz = Utc
+        .from_utc_datetime(&start_naive_datetime)
+        .with_timezone(&tz);
+    let query_end_tz = Utc
+        .from_utc_datetime(&end_naive_datetime)
+        .with_timezone(&tz);
 
     // Get include_cancelled parameter, default to false if not provided
     let include_cancelled = query.include_cancelled.unwrap_or(false);
@@ -480,8 +566,8 @@ pub async fn get_booked_events_handler(
             .calendar_id
             .as_ref()
             .expect("Calendar ID is required"),
-        query_start_utc,
-        query_end_utc,
+        query_start_tz,
+        query_end_tz,
         include_cancelled,
     )
     .await

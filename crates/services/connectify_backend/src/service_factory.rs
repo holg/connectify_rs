@@ -7,6 +7,7 @@ use std::sync::Arc;
 #[allow(unused_imports)] // even so it is used only by certain features, this shall change
 use {
     chrono::{DateTime, Utc},
+    chrono_tz::Tz,
     connectify_common::is_feature_enabled,
     connectify_common::services::{
         BookedEvent, BoxedError, CalendarEvent, CalendarEventResult, CalendarService,
@@ -112,13 +113,13 @@ impl ConnectifyServiceFactory {
                             fn get_busy_times(
                                 &self,
                                 calendar_id: &str,
-                                start_time: DateTime<Utc>,
-                                end_time: DateTime<Utc>,
+                                start_time: DateTime<Tz>,
+                                end_time: DateTime<Tz>,
                             ) -> std::pin::Pin<
                                 Box<
                                     dyn std::future::Future<
                                             Output = Result<
-                                                Vec<(DateTime<Utc>, DateTime<Utc>)>,
+                                                Vec<(DateTime<Tz>, DateTime<Tz>)>,
                                                 Self::Error,
                                             >,
                                         > + Send
@@ -216,8 +217,8 @@ impl ConnectifyServiceFactory {
                             fn get_booked_events(
                                 &self,
                                 calendar_id: &str,
-                                start_time: DateTime<Utc>,
-                                end_time: DateTime<Utc>,
+                                start_time: DateTime<Tz>,
+                                end_time: DateTime<Tz>,
                                 include_cancelled: bool,
                             ) -> std::pin::Pin<
                                 Box<

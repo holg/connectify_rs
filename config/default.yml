@@ -15,7 +15,9 @@ twilio:
   account_sid: "secret_from_env"
   api_key_sid: "secret_from_env"
   api_key_secret: "secret_from_env"
+  auth_token: "secret_from_env"
   verify_service_sid: "secret_from_env"
+  phone_number: "secret_from_env"
 
 stripe:
   secret_key: "secret_from_env"
@@ -53,11 +55,17 @@ gcal:
   client_secret: "secret_from_env"
   refresh_token: "secret_from_env"
   key_path: "./service_account_key.json"
+  calendar_id: "primary"
 calendly:
   client_id: "secret_from_env"
   client_secret: "secret_from_env"
   refresh_token: "secret_from_env"
   redirect_uri: "https://example.com/api/calendly/callback"
+  preparation_time_minutes: 60
+  time_zone: "Europe/Zurich"
+  working_days: [ "Mon", "Tue", "Wed", "Thu", "Fri" ]
+  work_start_time: "09:00"
+  work_end_time: "17:00"
 
 fulfillment:
   FULFILLMENT_SHARED_SECRET: "secret_from_env"

@@ -29,7 +29,10 @@ fn main() {
             info!("  Check your configuration files and environment variables.");
         }
 
-        panic!("Failed to load configuration. See error details above.");
+        panic!(
+            "Failed to load configuration. See error details above.{:?}",
+            err
+        );
     });
 
     info!("build.rs: successfully loaded config");
