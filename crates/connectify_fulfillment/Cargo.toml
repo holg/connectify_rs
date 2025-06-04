@@ -1,5 +1,3 @@
-# --- File: crates/connectify_fulfillment/Cargo.toml ---
-
 [package]
 name = "connectify-fulfillment"
 version = "0.1.0"
@@ -9,7 +7,7 @@ description = "Handles fulfillment logic for Connectify (e.g., booking after pay
 license = "MIT OR Apache-2.0" # Choose appropriate license
 
 [features]
-openapi = [ # If this crate exposes its own API endpoints to be documented
+openapi = [# If this crate exposes its own API endpoints to be documented
     "dep:utoipa",
     "utoipa/axum_extras",
     # No Swagger UI needed here, backend serves that
@@ -32,15 +30,15 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
-connectify-config = { path = "../connectify_config"} # To access AppConfig, including fulfillment secret
+connectify-config = { path = "../connectify_config" } # To access AppConfig, including fulfillment secret
 tracing = { workspace = true }
 # reqwest = { workspace = true } # Only if this crate makes OUTBOUND http calls
 
 # --- Dependencies on other feature crates (for their logic) ---
 # These should be optional if the fulfillment actions are conditional
 connectify-gcal = { path = "../connectify_gcal", optional = true }
-connectify-twilio = {path = "../connectify_twilio", optional = true }
-connectify-adhoc = {path = "../connectify_adhoc", optional = true }
+connectify-twilio = { path = "../connectify_twilio", optional = true }
+connectify-adhoc = { path = "../connectify_adhoc", optional = true }
 # connectify-storage = { workspace = true, optional = true } # If it needs direct DB access
 
 # --- Crate Specific External Deps ---

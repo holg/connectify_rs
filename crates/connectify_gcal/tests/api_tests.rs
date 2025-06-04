@@ -56,6 +56,7 @@ fn create_mock_config() -> Arc<AppConfig> {
         use_fulfillment: false,
         use_calendly: false,
         use_adhoc: false,
+        use_firebase: false,
         server: connectify_config::ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 8080,
@@ -69,6 +70,7 @@ fn create_mock_config() -> Arc<AppConfig> {
         payrexx: None,
         fulfillment: None,
         adhoc_settings: None,
+        firebase: None,
     })
 }
 

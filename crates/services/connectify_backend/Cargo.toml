@@ -32,7 +32,14 @@ fulfillment = [
     "connectify-fulfillment",
     "connectify-fulfillment/openapi", # ✅ forward the feature
 ]
-gcal_fulfillment = ["connectify-gcal", "connectify-fulfillment", "connectify-fulfillment/gcal"]
+gcal_fulfillment = [
+    "connectify-fulfillment",
+    "connectify-gcal",
+    "connectify-fulfillment/gcal",
+    "connectify-twilio",
+    "connectify-fulfillment/twilio"
+]
+firebase = ["connectify-firebase", "connectify-firebase/openapi"]
 
 adhoc = ["connectify-adhoc", "connectify-adhoc/openapi", "connectify-adhoc/stripe", "connectify-adhoc/gcal", "connectify-fulfillment"]
 [dependencies]
@@ -49,8 +56,9 @@ connectify-gcal = { path = "../../connectify_gcal", optional = true }
 connectify-common = { path = "../../connectify_common" }
 connectify-payrexx = { path = "../../connectify_payrexx", optional = true }
 connectify-stripe = { path = "../../connectify_stripe", optional = true }
-connectify-fulfillment = { path = "../../connectify_fulfillment", optional = true }
+connectify-fulfillment = { path = "../../connectify_fulfillment",optional = true }
 connectify-adhoc = { path = "../../connectify_adhoc", optional = true }
+connectify-firebase = { path = "../../connectify_firebase", optional = true }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }
 utoipa = { workspace = true, optional = true }

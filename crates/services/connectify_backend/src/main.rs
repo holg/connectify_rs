@@ -125,6 +125,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
+    #[cfg(feature = "firebase")]
+    {
+        if is_feature_enabled(&config, config.use_firebase, config.firebase.as_ref()) {
+            info!("🔌 Merging Firebase routes...");
+            api_router = api_router.merge(connectify_firebase::routes(config.clone()));
+            // Adhoc routes take Arc<AppConfig> and potentially GcalState
+            #[cfg(not(feature = "firebase"))]
+            {
+                // When gcal feature is not enabled, call with just one argument
+                api_router = api_router.merge(connectify_adhoc::routes(config.clone()));
+            }
+            // // When both adhoc and gcal features are enabled, but not adhoc_gcal
+            // #[cfg(feature = "firebase")]
+            // {
+            //     info!("🔌 Merging GCal Adhoc routes...");
+            //     let gcal_hub_option = app_state
+            //         .gcal_state
+            //         .as_ref()
+            //         .map(|state| state.calendar_hub.clone());
+            //     api_router =
+            //         api_router.merge(connectify_adhoc::routes(config.clone(), gcal_hub_option));
+            // }
+        }
+    }
 
     // --- Create Main App Router ---
     // Nest all API routes under /api
@@ -135,6 +159,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         #[cfg(feature = "adhoc")]
         use connectify_adhoc::doc::AdhocApiDoc;
+        #[cfg(feature = "firebase")]
+        use connectify_firebase::doc::FirebaseApiDoc;
         #[cfg(feature = "fulfillment")]
         use connectify_fulfillment::doc::FulfillmentApiDoc;
         #[cfg(feature = "gcal")]
@@ -178,6 +204,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         openapi_doc.merge(PayrexxApiDoc::openapi());
         #[cfg(all(feature = "adhoc", feature = "openapi"))]
         openapi_doc.merge(AdhocApiDoc::openapi());
+        #[cfg(all(feature = "firebase", feature = "openapi"))]
+        openapi_doc.merge(FirebaseApiDoc::openapi());
         info!("📖 Adding Swagger UI at /admin/api/docs");
 
         // Create the Swagger UI route, referencing the merged doc
@@ -204,6 +232,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(&addr).await.unwrap();
     info!("Starting server at http://{}", addr);
     info!("API endpoints available at http://{}/api", addr);
+    #[cfg(feature = "openapi")]
+    info!("Swgger UI available at http://{}/admin/api/docs", addr);
 
     axum::serve(listener, app.into_make_service()).await?;
     Ok(())

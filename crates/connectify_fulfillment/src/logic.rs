@@ -1,12 +1,12 @@
-// --- File: crates/connectify_fulfillment/src/logic.rs ---
-
-use connectify_config::GcalConfig;
+use axum::extract::State;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use thiserror::Error;
 #[allow(unused_imports)]
 use tracing::{info, warn}; // To access GCal config
                            // use std::sync::Arc;
 
+use crate::FulfillmentState;
 /// Conditionally imports Google Calendar related functionality when the "gcal" feature is enabled.
 ///
 /// This import block brings in the necessary types and functions from the `connectify_gcal` crate
@@ -25,8 +25,11 @@ use connectify_gcal::{
         create_calendar_event as gcal_create_event, BookSlotRequest as GcalBookSlotRequest,
         GcalError,
     }, // GCal's booking logic and request struct
-                               // auth::HubType as GcalHubType, // The GCal Hub type
 };
+
+// Import SmsRequest directly from connectify_twilio to avoid confusion
+#[cfg(feature = "twilio")]
+use connectify_twilio::twilio_sms::SmsRequest;
 
 // --- Error Handling for Fulfillment ---
 #[derive(Error, Debug)]
@@ -79,9 +82,6 @@ pub struct GcalBookingFulfillmentRequest {
     pub room_name: Option<String>,
 }
 
-// TODO: Add request structs for other fulfillment types
-// pub struct TwilioAdhocSessionFulfillmentRequest { ... }
-
 // --- Response Structures for Fulfillment Tasks ---
 
 #[derive(Serialize, Debug, Clone)]
@@ -101,7 +101,7 @@ pub struct FulfillmentResponse {
 /// This function will be called by the corresponding handler.
 #[cfg(feature = "gcal")] // Only compile if gcal feature is active for this crate
 pub async fn fulfill_gcal_booking_logic(
-    gcal_config: &GcalConfig, // Specific GCal config from AppConfig
+    State(state): State<Arc<FulfillmentState>>, // Specific GCal config from AppConfig
     payload: GcalBookingFulfillmentRequest,
     // We need a CalendarHub. It can be created here or passed in if already initialized.
     // Creating it here makes this function more self-contained but might re-create clients.
@@ -109,7 +109,11 @@ pub async fn fulfill_gcal_booking_logic(
     // For now, let's create it here for simplicity, assuming gcal_config has key_path.
 ) -> Result<FulfillmentResponse, FulfillmentError> {
     info!("Attempting to fulfill GCal booking: {:?}", payload.summary);
-
+    let gcal_config = state
+        .config
+        .gcal
+        .as_ref()
+        .expect("GCal config not found in AppConfig");
     // 1. Create the CalendarHub instance
     // This requires the GcalConfig to have the necessary details (key_path)
     let hub = create_calendar_hub(gcal_config).await.map_err(|e| {
@@ -118,8 +122,8 @@ pub async fn fulfill_gcal_booking_logic(
 
     // 2. Prepare the booking request for the connectify_gcal::logic module
     let gcal_book_request = GcalBookSlotRequest {
-        start_time: payload.start_time,
-        end_time: payload.end_time,
+        start_time: payload.start_time.clone(),
+        end_time: payload.end_time.clone(),
         summary: payload.summary.clone(),
         description: payload.description,
         payment_method: payload.payment_method,
@@ -146,6 +150,51 @@ pub async fn fulfill_gcal_booking_logic(
         Ok(created_event) => {
             let event_id = created_event.id;
             info!("Successfully booked GCal event. ID: {:?}", event_id);
+
+            // Send SMS notification if Twilio is enabled - using modified approach
+            #[cfg(feature = "twilio")]
+            {
+                info!("Twilio feature is enabled at compile time");
+                if let Some(twilio_config) = state.config.twilio.as_ref() {
+                    if state.config.use_twilio {
+                        info!("Twilio is enabled in runtime config, preparing to send SMS");
+
+                        // Create an explicit instance of SmsRequest from connectify_twilio
+                        let sms_request = SmsRequest {
+                            to: twilio_config.phone_number.to_string(),
+                            message: format!(
+                                "Appointment confirmed: start_time: {}, end_time: {}, summary: {}",
+                                &payload.start_time, &payload.end_time, &payload.summary
+                            ),
+                        };
+
+                        // Use the full path for the send_sms function
+                        match connectify_twilio::twilio_sms::send_sms(
+                            State(state.config.clone()),
+                            axum::Json(sms_request),
+                        )
+                        .await
+                        {
+                            Ok(_) => {
+                                info!("SMS notification sent successfully");
+                            }
+                            Err(e) => {
+                                warn!("Failed to send SMS notification: {:?}", e);
+                            }
+                        }
+                    } else {
+                        info!("Twilio is disabled in runtime config");
+                    }
+                } else {
+                    warn!("Twilio config section missing in AppConfig");
+                }
+            }
+
+            #[cfg(not(feature = "twilio"))]
+            {
+                info!("Twilio feature is not enabled at compile time");
+            }
+
             Ok(FulfillmentResponse {
                 success: true,
                 message: "Google Calendar event booked successfully.".to_string(),
@@ -187,9 +236,14 @@ pub struct AdhocGcalTwilioFulfillmentRequest {
 
 #[cfg(feature = "gcal")] // This fulfillment type also depends on GCal
 pub async fn fulfill_adhoc_gcal_twilio_logic(
-    gcal_config: &GcalConfig,
+    State(state): State<Arc<FulfillmentState>>,
     payload: AdhocGcalTwilioFulfillmentRequest,
 ) -> Result<FulfillmentResponse, FulfillmentError> {
+    let gcal_config = state
+        .config
+        .gcal
+        .as_ref()
+        .expect("GCal config not found in AppConfig");
     info!(
         "[Fulfillment Logic] Attempting Adhoc GCal booking for room: {}, summary: {}",
         payload.room_name, payload.summary
@@ -206,10 +260,10 @@ pub async fn fulfill_adhoc_gcal_twilio_logic(
     })?;
 
     let gcal_book_request = GcalBookSlotRequest {
-        start_time: payload.start_time,
-        end_time: payload.end_time,
+        start_time: payload.start_time.clone(),
+        end_time: payload.end_time.clone(),
         summary: payload.summary.clone(),
-        description: payload.description,
+        description: payload.description.clone(),
         payment_method: Some(payload.payment_method.unwrap_or("stripe".to_string())),
         payment_amount: Some(payload.payment_amount.unwrap_or(0)),
         payment_id: Some(
@@ -228,6 +282,54 @@ pub async fn fulfill_adhoc_gcal_twilio_logic(
                 event_id,
                 payload.room_name.clone()
             );
+
+            // Send SMS notification if Twilio is enabled - using modified approach
+            #[cfg(feature = "twilio")]
+            {
+                info!("Twilio feature is enabled at compile time for adhoc");
+                if let Some(twilio_config) = state.config.twilio.as_ref() {
+                    if state.config.use_twilio {
+                        info!("Twilio is enabled in runtime config, preparing to send adhoc SMS");
+
+                        // Create an explicit instance of SmsRequest
+                        let sms_request = SmsRequest {
+                            to: twilio_config.phone_number.to_string(),
+                            message: format!(
+                                "Adhoc session booked: room: {}, start: {}, end: {}, summary: {}",
+                                &payload.room_name,
+                                &payload.start_time,
+                                &payload.end_time,
+                                &payload.summary
+                            ),
+                        };
+
+                        // Use the full path for the send_sms function
+                        match connectify_twilio::twilio_sms::send_sms(
+                            State(state.config.clone()),
+                            axum::Json(sms_request),
+                        )
+                        .await
+                        {
+                            Ok(_) => {
+                                info!("Adhoc SMS notification sent successfully");
+                            }
+                            Err(e) => {
+                                warn!("Failed to send adhoc SMS notification: {:?}", e);
+                            }
+                        }
+                    } else {
+                        info!("Twilio is disabled in runtime config");
+                    }
+                } else {
+                    warn!("Twilio config section missing in AppConfig");
+                }
+            }
+
+            #[cfg(not(feature = "twilio"))]
+            {
+                info!("Twilio feature is not enabled at compile time for adhoc");
+            }
+
             Ok(FulfillmentResponse {
                 success: true,
                 message: "Adhoc Google Calendar event booked successfully.".to_string(),
@@ -251,7 +353,7 @@ pub async fn fulfill_adhoc_gcal_twilio_logic(
 
 #[cfg(not(feature = "gcal"))]
 pub async fn fulfill_adhoc_gcal_twilio_logic(
-    _gcal_config: &GcalConfig,
+    _state: State<Arc<FulfillmentState>>,
     _payload: AdhocGcalTwilioFulfillmentRequest,
 ) -> Result<FulfillmentResponse, FulfillmentError> {
     info!("[Fulfillment Logic] GCal feature not enabled. Cannot fulfill Adhoc GCal booking.");

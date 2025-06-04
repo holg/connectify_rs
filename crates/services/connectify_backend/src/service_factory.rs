@@ -29,6 +29,9 @@ use connectify_stripe::service::StripePaymentService;
 #[cfg(feature = "twilio")]
 use connectify_twilio::service::TwilioNotificationService;
 
+#[cfg(feature = "firebase")]
+use connectify_firebase::service::FirebaseServiceFactory;
+
 /// Service factory implementation.
 ///
 /// This struct implements the `ServiceFactory` trait, providing access to all external services
@@ -60,6 +63,8 @@ pub struct ConnectifyServiceFactory {
     payment_service: Option<Arc<dyn PaymentService<Error = BoxedError>>>,
     #[cfg(feature = "twilio")]
     notification_service: Option<Arc<dyn NotificationService<Error = BoxedError>>>,
+    #[cfg(feature = "firebase")]
+    firebase_service_factory: Option<Arc<FirebaseServiceFactory>>,
 }
 
 impl ConnectifyServiceFactory {
@@ -74,6 +79,8 @@ impl ConnectifyServiceFactory {
             payment_service: None,
             #[cfg(feature = "twilio")]
             notification_service: None,
+            #[cfg(feature = "firebase")]
+            firebase_service_factory: None,
         };
 
         // Initialize services based on configuration
@@ -453,6 +460,17 @@ impl ConnectifyServiceFactory {
             }
         }
 
+        // Initialize Firebase service if enabled
+        #[cfg(feature = "firebase")]
+        {
+            if is_feature_enabled(&config, config.use_firebase, config.firebase.as_ref()) {
+                info!("ℹ️ Initializing Firebase service factory...");
+                let firebase_factory = FirebaseServiceFactory::new(config.clone());
+                factory.firebase_service_factory = Some(Arc::new(firebase_factory));
+                info!("✅ Firebase service factory initialized.");
+            }
+        }
+
         factory
     }
 }
@@ -461,34 +479,61 @@ impl ServiceFactory for ConnectifyServiceFactory {
     fn calendar_service(&self) -> Option<Arc<dyn CalendarService<Error = BoxedError>>> {
         #[cfg(feature = "gcal")]
         {
-            self.calendar_service.clone()
+            if let Some(service) = self.calendar_service.clone() {
+                return Some(service);
+            }
         }
-        #[cfg(not(feature = "gcal"))]
+
+        #[cfg(feature = "firebase")]
         {
-            None
+            if let Some(firebase_factory) = &self.firebase_service_factory {
+                if let Some(service) = firebase_factory.calendar_service() {
+                    return Some(service);
+                }
+            }
         }
+
+        None
     }
 
     fn payment_service(&self) -> Option<Arc<dyn PaymentService<Error = BoxedError>>> {
         #[cfg(feature = "stripe")]
         {
-            self.payment_service.clone()
+            if let Some(service) = self.payment_service.clone() {
+                return Some(service);
+            }
         }
-        #[cfg(not(feature = "stripe"))]
+
+        #[cfg(feature = "firebase")]
         {
-            None
+            if let Some(firebase_factory) = &self.firebase_service_factory {
+                if let Some(service) = firebase_factory.payment_service() {
+                    return Some(service);
+                }
+            }
         }
+
+        None
     }
 
     fn notification_service(&self) -> Option<Arc<dyn NotificationService<Error = BoxedError>>> {
         #[cfg(feature = "twilio")]
         {
-            self.notification_service.clone()
+            if let Some(service) = self.notification_service.clone() {
+                return Some(service);
+            }
         }
-        #[cfg(not(feature = "twilio"))]
+
+        #[cfg(feature = "firebase")]
         {
-            None
+            if let Some(firebase_factory) = &self.firebase_service_factory {
+                if let Some(service) = firebase_factory.notification_service() {
+                    return Some(service);
+                }
+            }
         }
+
+        None
     }
 }
 
@@ -509,6 +554,8 @@ pub mod mock {
         payment_service: Option<Arc<dyn PaymentService<Error = BoxedError>>>,
         #[cfg(feature = "twilio")]
         notification_service: Option<Arc<dyn NotificationService<Error = BoxedError>>>,
+        #[cfg(feature = "firebase")]
+        firebase_service_factory: Option<Arc<FirebaseServiceFactory>>,
     }
 
     impl Default for MockServiceFactory {
@@ -527,6 +574,8 @@ pub mod mock {
                 payment_service: None,
                 #[cfg(feature = "twilio")]
                 notification_service: None,
+                #[cfg(feature = "firebase")]
+                firebase_service_factory: None,
             }
         }
     }
@@ -535,34 +584,61 @@ pub mod mock {
         fn calendar_service(&self) -> Option<Arc<dyn CalendarService<Error = BoxedError>>> {
             #[cfg(feature = "gcal")]
             {
-                self.calendar_service.clone()
+                if let Some(service) = self.calendar_service.clone() {
+                    return Some(service);
+                }
             }
-            #[cfg(not(feature = "gcal"))]
+
+            #[cfg(feature = "firebase")]
             {
-                None
+                if let Some(firebase_factory) = &self.firebase_service_factory {
+                    if let Some(service) = firebase_factory.calendar_service() {
+                        return Some(service);
+                    }
+                }
             }
+
+            None
         }
 
         fn payment_service(&self) -> Option<Arc<dyn PaymentService<Error = BoxedError>>> {
             #[cfg(feature = "stripe")]
             {
-                self.payment_service.clone()
+                if let Some(service) = self.payment_service.clone() {
+                    return Some(service);
+                }
             }
-            #[cfg(not(feature = "stripe"))]
+
+            #[cfg(feature = "firebase")]
             {
-                None
+                if let Some(firebase_factory) = &self.firebase_service_factory {
+                    if let Some(service) = firebase_factory.payment_service() {
+                        return Some(service);
+                    }
+                }
             }
+
+            None
         }
 
         fn notification_service(&self) -> Option<Arc<dyn NotificationService<Error = BoxedError>>> {
             #[cfg(feature = "twilio")]
             {
-                self.notification_service.clone()
+                if let Some(service) = self.notification_service.clone() {
+                    return Some(service);
+                }
             }
-            #[cfg(not(feature = "twilio"))]
+
+            #[cfg(feature = "firebase")]
             {
-                None
+                if let Some(firebase_factory) = &self.firebase_service_factory {
+                    if let Some(service) = firebase_factory.notification_service() {
+                        return Some(service);
+                    }
+                }
             }
+
+            None
         }
     }
 }

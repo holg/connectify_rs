@@ -73,3 +73,8 @@ fulfillment:
 adhoc_settings:
   admin_enabled: true
   preparation_time_minutes: 120
+
+firebase:
+  key_path: "./config/firebase_config.json"
+  project_id: "my-admin-1"
+  server_key: null

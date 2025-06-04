@@ -3,10 +3,10 @@
 use crate::handlers::get_booked_events_handler;
 use crate::handlers::{
     book_slot_handler, delete_event_handler, get_availability_handler,
-    mark_booking_cancelled_handler, GcalState,
+    mark_booking_cancelled_handler, options_handler, GcalState,
 };
 use axum::{
-    routing::{delete, get, patch, post}, // Add delete here
+    routing::{delete, get, options, patch, post}, // Add options here
     Router,
 };
 
@@ -49,6 +49,7 @@ pub async fn routes(config: Arc<AppConfig>) -> Router {
             patch(mark_booking_cancelled_handler),
         )
         .route("/admin/bookings", get(get_booked_events_handler))
+        .route("/admin/bookings", options(options_handler))
         // Add this new route
         .with_state(gcal_state)
 }

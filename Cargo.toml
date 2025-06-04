@@ -5,13 +5,14 @@ members = [
     "crates/services/connectify_backend",
     "crates/connectify_config_static",
     "crates/connectify_config",
-#    "crates/connectify_calendly",
+    #    "crates/connectify_calendly",
     "crates/connectify_gcal",
     "crates/connectify_common",
     "crates/connectify_payrexx",
     "crates/connectify_stripe",
     "crates/connectify_fulfillment",
     "crates/connectify_adhoc",
+    "crates/connectify_firebase",
 ]
 resolver = "2"  # required for clean feature resolution across crates
 
@@ -26,15 +27,15 @@ config = "0.15"
 dotenv = "0.15"
 once_cell = "1.21"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3" , features = ["env-filter"]}
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 # Journald is Linux-only; compile gated with #[cfg]
 tracing-journald = "0.3"
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
-utoipa = { version = "5"}
+utoipa = { version = "5" }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"]}
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 thiserror = "2"
 http = "1.0"
 hmac = "0.12.1"

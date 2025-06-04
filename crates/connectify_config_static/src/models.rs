@@ -126,6 +126,14 @@ pub struct AdhocSessionSettings {
     pub preparation_time_minutes: i64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct FirebaseConfig {
+    pub key_path: Option<String>,
+    pub project_id: Option<String>,
+    pub server_key: Option<String>,
+}
+
 fn default_adhoc_preparation_time() -> i64 {
     15
 } // Default 15 minutes preparation
@@ -152,6 +160,8 @@ pub struct AppConfig {
     pub use_calendly: bool,
     #[serde(default)]
     pub use_adhoc: bool,
+    #[serde(default)]
+    pub use_firebase: bool,
 
     // --- Optional Feature Configurations ---
     #[serde(default)]
@@ -168,4 +178,6 @@ pub struct AppConfig {
     pub gcal: Option<GcalConfig>,
     #[serde(default)]
     pub adhoc_settings: Option<AdhocSessionSettings>,
+    #[serde(default)]
+    pub firebase: Option<FirebaseConfig>,
 }

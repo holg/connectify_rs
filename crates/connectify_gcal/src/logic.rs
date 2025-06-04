@@ -210,6 +210,18 @@ pub fn calculate_available_slots(
 
     // For testing purposes, always use the query_start directly
     // This ensures that we can test with fixed dates in the future
+    debug!(
+        "query_start: {:?}, {:?},{:?},{:?},{:?}, {:?}, {:?}, {:?}, {:?}",
+        query_start,
+        query_end,
+        busy_periods,
+        duration,
+        work_start_time,
+        work_end_time,
+        working_days,
+        buffer_time,
+        step
+    );
     let adjusted_query_start = query_start;
     let mut available_slots = Vec::new();
     let mut current_check_time = adjusted_query_start;
@@ -270,7 +282,10 @@ pub fn calculate_available_slots(
 
     // Merge overlapping/adjacent busy periods for efficiency
     let merged_busy = merge_busy_periods(busy_periods);
-
+    debug!(
+        "current_check_time: {:?}, query_end: {:?}",
+        current_check_time, query_end
+    );
     while current_check_time < query_end {
         let potential_start_time = current_check_time;
         let potential_end_time = match potential_start_time.checked_add_signed(duration) {
@@ -364,7 +379,11 @@ pub fn calculate_available_slots(
                 && work_end_time.minute() == 59
                 && end_time_of_day.hour() == 0
                 && end_time_of_day.minute() == 0;
-
+            // Otherwise, only include slots that end within working hours
+            debug!(
+                "end_time_of_day: {:?}, work_end_time: {:?}, is_midnight_edge_case: {:?}",
+                end_time_of_day, work_end_time, is_midnight_edge_case
+            );
             if end_time_of_day <= work_end_time || is_midnight_edge_case {
                 available_slots.push((start_zurich, end_zurich));
             }

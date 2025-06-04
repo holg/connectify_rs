@@ -112,7 +112,10 @@ pub async fn get_availability_handler(
             "end_date must be after start_date".to_string(),
         ));
     }
-
+    info!(
+        "Parsed dates: start={}, end={}",
+        start_naive_date, end_naive_date
+    );
     // Compute Tz boundaries for the query range
     let start_naive_datetime = start_naive_date.and_hms_opt(0, 0, 0).unwrap();
     // Set end time to end of day (23:59:59) to ensure the time range is not empty
@@ -504,6 +507,20 @@ pub async fn mark_booking_cancelled_handler(
             }
         }
     }
+}
+
+/// Handler for OPTIONS requests to support CORS preflight
+pub async fn options_handler() -> impl axum::response::IntoResponse {
+    // Return appropriate CORS headers for preflight requests
+    (
+        StatusCode::OK,
+        [
+            ("Access-Control-Allow-Origin", "*"),
+            ("Access-Control-Allow-Methods", "GET, OPTIONS"),
+            ("Access-Control-Allow-Headers", "Content-Type"),
+            ("Access-Control-Max-Age", "86400"),
+        ],
+    )
 }
 
 /// Handler to get booked time slots.

@@ -18,8 +18,7 @@ mod tests {
 
         // Create a test SMS request
         let request = Json(SmsRequest {
-            // to: "whatsapp:+4917640134160".to_string(),
-            to: "whatsapp:+4917640134160".to_string(),
+            to: "whatsapp:+1 123123123123".to_string(),
             message: "Test message von OSS Web Connectify RS".to_string(),
         });
 

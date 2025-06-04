@@ -22,8 +22,7 @@ use crate::logic::{
 // Conditionally import GcalState if the 'gcal' feature is enabled for this crate
 #[cfg(feature = "gcal")]
 use connectify_gcal::handlers::GcalState as ConnectifyGcalState; // Alias to avoid name clash if any
-
-// --- State for Fulfillment Handlers ---
+                                                                 // --- State for Fulfillment Handlers ---
 #[derive(Clone)] // Added Debug for logging in routes.rs
 pub struct FulfillmentState {
     pub config: Arc<AppConfig>,
@@ -57,8 +56,7 @@ pub async fn handle_gcal_booking_fulfillment(
         payload.summary
     );
 
-    // TODO: Implement Authentication for this internal endpoint.
-    // Check shared secret from state.config.fulfillment.shared_secret
+    // Authentication is handled by the fulfillment_auth_middleware in auth.rs
 
     // Check if GCal is enabled in the main app config
     if !state.config.use_gcal {
@@ -67,24 +65,7 @@ pub async fn handle_gcal_booking_fulfillment(
             "GCal feature is not enabled in config.".to_string(),
         ));
     }
-
-    let gcal_config = state.config.gcal.as_ref().ok_or_else(|| {
-        info!("[Fulfillment Handler] GCal configuration missing in AppConfig for fulfillment.");
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Server configuration error for GCal".to_string(),
-        )
-    })?;
-
-    // If you decide to pass the GcalState (and thus the pre-initialized Hub) to the logic function:
-    // let gcal_hub_to_use = state.gcal_state_for_fulfillment.as_ref()
-    //     .ok_or_else(|| {
-    //         info!("[Fulfillment Handler] GcalState (and Hub) not available for fulfillment.");
-    //         (StatusCode::INTERNAL_SERVER_ERROR, "GCal client not initialized for fulfillment.".to_string())
-    //     })?.calendar_hub.clone(); // Clone the Arc<HubType>
-
-    // For now, fulfill_gcal_booking_logic creates its own hub from gcal_config
-    match fulfill_gcal_booking_logic(gcal_config, payload).await {
+    match fulfill_gcal_booking_logic(State(state), payload).await {
         Ok(response) => {
             info!(
                 "[Fulfillment Handler] GCal booking fulfillment successful: {:?}",
@@ -149,6 +130,8 @@ pub async fn handle_adhoc_gcal_twilio_fulfillment(
         payload.room_name
     );
 
+    // Authentication is handled by the fulfillment_auth_middleware in auth.rs
+
     // Check if GCal is enabled in the main app config (needed for booking the slot)
     if !state.config.use_gcal {
         return Err((
@@ -164,16 +147,8 @@ pub async fn handle_adhoc_gcal_twilio_fulfillment(
         ));
     }
 
-    let gcal_config = state.config.gcal.as_ref().ok_or_else(|| {
-        warn!("[Fulfillment Handler] GCal configuration missing for adhoc fulfillment.");
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Server configuration error for GCal (adhoc)".to_string(),
-        )
-    })?;
-
     // Call the adhoc fulfillment logic
-    match fulfill_adhoc_gcal_twilio_logic(gcal_config, payload).await {
+    match fulfill_adhoc_gcal_twilio_logic(State(state), payload).await {
         Ok(response) => {
             info!(
                 "[Fulfillment Handler] Adhoc GCal booking successful: Event ID {:?}, Room: {:?}",

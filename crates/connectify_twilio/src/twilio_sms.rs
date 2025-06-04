@@ -34,13 +34,12 @@ pub async fn send_sms(
         "https://api.twilio.com/2010-04-01/Accounts/{}/Messages.json",
         twilio_config.account_sid
     );
-
-    // Use lowercase keys
     let params = [
-        ("To", request.to.as_str()),
-        ("From", twilio_config.phone_number.as_str()),
         ("Body", request.message.as_str()),
+        ("From", "whatsapp:+14155238886"),
+        ("To", request.to.as_str()),
     ];
+    // Use lowercase keys
     info!("Sending SMS to {}: {}", &request.to, &request.message);
     let resp = Client::new()
         // 👇 **account_sid** + **auth_token** here
