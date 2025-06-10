@@ -60,6 +60,7 @@ connectify_rs/
 │   ├── connectify_gcal       # Google Calendar integration
 │   ├── connectify_calendly   # Calendly integration (WIP)
 │   ├── connectify_fulfillment# Fulfillment workflows
+│   ├── connectify_firebase   # Firebase Cloud Messaging integration
 │   └── services/
 │       ├── connectify_backend# Main Axum API service
 │       └── rustdis/          # Experimental placeholder service
@@ -136,6 +137,55 @@ Documentation includes all compiled feature endpoints.
 ## Crate Details
 See individual crate READMEs under `crates/` for full API and configuration specifics.
 
+### Firebase Integration
+The `connectify_firebase` crate provides integration with Firebase Cloud Messaging (FCM) for sending push notifications to mobile devices. It includes a `DeviceRegistrationRepository` for storing and retrieving device registration tokens.
+
+#### Configuring the DeviceRegistrationRepository
+
+The `DeviceRegistrationRepository` is used to store and retrieve device registration tokens for push notifications. There are two ways to configure it:
+
+1. **Direct Configuration**:
+
+```
+// Create a database client
+let db_client = DbClient::new("sqlite:example.db").await?;
+
+// Create the SQL repository
+let sql_repo = SqlDeviceRegistrationRepository::new(db_client);
+
+// Create the Firebase repository wrapper
+let firebase_repo = DeviceRegistrationRepository::new(sql_repo);
+
+// Configure the Firebase client with the repository
+let firebase_client = FirebaseClient::new(firebase_config)
+    .with_repository(firebase_repo);
+```
+
+2. **Lazy Initialization**:
+
+```
+// Create the factories
+let db_client_factory = DbClientFactory::new();
+let repository_factory = DeviceRegistrationRepositoryFactory::new();
+
+// Configure the Firebase client with lazy repository initialization
+let firebase_client = FirebaseClient::new(firebase_config)
+    .with_lazy_repository(
+        Arc::new(app_config),
+        db_client_factory,
+        repository_factory
+    );
+```
+
+The repository requires the `database` feature to be enabled:
+
+```
+# In Cargo.toml
+connectify_firebase = { version = "0.1.0", features = ["database"] }
+```
+
+When the `database` feature is enabled, the Firebase client can store and retrieve device registration tokens. Without this feature, methods that require database access will return an error.
+
 ## Testing
 - Run tests per crate: `cargo test -p <crate> --features <features>`.
 - Run all tests: `cargo test --all-features`.
@@ -155,4 +205,4 @@ See individual crate READMEs under `crates/` for full API and configuration spec
 4. Submit a pull request.
 
 ## License
-This project is licensed under MIT OR Apache-2.0 (see crates’ `Cargo.toml`).
+This project is licensed under MIT OR Apache-2.0 (see crates' `Cargo.toml`).

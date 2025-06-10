@@ -3,7 +3,10 @@
 use utoipa::OpenApi;
 
 use crate::client::{FcmMessage, Message, Notification};
-use crate::handlers::{SendNotificationRequest, SendNotificationResponse};
+use crate::handlers::{
+    RegisterDeviceRequest, RegisterDeviceResponse, SendNotificationRequest,
+    SendNotificationResponse,
+};
 
 #[utoipa::path(
     post,
@@ -51,15 +54,56 @@ use crate::handlers::{SendNotificationRequest, SendNotificationResponse};
 )]
 fn doc_send_notification_handler() {}
 
+#[utoipa::path(
+    post,
+    path = "/firebase/register-device",
+    request_body(content = RegisterDeviceRequest, example = json!({
+        "user_id": "user123",
+        "device_id": "device456",
+        "registration_token": "fcm-registration-token-example"
+    })),
+    responses(
+        (status = 200, description = "Device registered successfully", body = RegisterDeviceResponse,
+         example = json!({
+             "success": true,
+             "user_id": "user123",
+             "device_id": "device456",
+             "error": null
+         })
+        ),
+        (status = 400, description = "Bad Request",
+         example = json!({
+             "success": false,
+             "user_id": "user123",
+             "device_id": "device456",
+             "error": "Invalid registration token"
+         })
+        ),
+        (status = 500, description = "Internal Server Error",
+         example = json!({
+             "success": false,
+             "user_id": "user123",
+             "device_id": "device456",
+             "error": "Failed to register device"
+         })
+        )
+    ),
+    tag = "Firebase"
+)]
+fn doc_register_device_handler() {}
+
 #[derive(OpenApi)]
 #[openapi(
     paths(
         doc_send_notification_handler,
+        doc_register_device_handler,
     ),
     components(
         schemas(
             SendNotificationRequest,
             SendNotificationResponse,
+            RegisterDeviceRequest,
+            RegisterDeviceResponse,
             FcmMessage,
             Message,
             Notification,

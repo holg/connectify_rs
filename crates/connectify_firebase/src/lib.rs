@@ -52,6 +52,9 @@ pub mod client;
 #[cfg(feature = "openapi")]
 pub mod doc;
 pub mod handlers;
+pub mod models;
+pub mod repository;
+pub mod repository_factory;
 pub mod routes;
 pub mod service;
 
@@ -59,6 +62,8 @@ pub mod service;
 pub use routes::routes;
 // Re-export the service factory
 pub use service::FirebaseServiceFactory;
+// Re-export the repository factory
+pub use repository_factory::DeviceRegistrationRepositoryFactory;
 
 #[cfg(feature = "openapi")]
 pub mod openapi {

@@ -181,3 +181,30 @@ pub struct AppConfig {
     #[serde(default)]
     pub firebase: Option<FirebaseConfig>,
 }
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            server: ServerConfig {
+                host: "127.0.0.1".to_string(),
+                port: 8080,
+            },
+            use_twilio: false,
+            use_stripe: false,
+            use_gcal: false,
+            use_fulfillment: false,
+            use_payrexx: false,
+            use_calendly: false,
+            use_adhoc: false,
+            use_firebase: false,
+            database: None,
+            twilio: None,
+            stripe: None,
+            fulfillment: None,
+            payrexx: None,
+            gcal: None,
+            adhoc_settings: None,
+            firebase: None,
+        }
+    }
+}

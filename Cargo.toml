@@ -13,6 +13,7 @@ members = [
     "crates/connectify_fulfillment",
     "crates/connectify_adhoc",
     "crates/connectify_firebase",
+    "crates/connectify_db",
 ]
 resolver = "2"  # required for clean feature resolution across crates
 

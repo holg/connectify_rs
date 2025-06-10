@@ -1,15 +1,17 @@
 [package]
-name = "connectify-firebase"
+name = "connectify-db"
 version = "0.1.0"
 edition = "2021"
 authors = ["Trahe Consult <trahe@mac.com>"]
-description = "Firebase Cloud Messaging integration for Connectify"
+description = "Database integration for Connectify"
 
 [features]
-default = []
-database = ["dep:connectify-db", "connectify-db/sqlite", "dep:sqlx"]
+default = ["sqlite"]
+sqlite = ["sqlx/sqlite"]
+postgres = ["sqlx/postgres"]
+mysql = ["sqlx/mysql"]
 openapi = [
-    "dep:utoipa", 
+    "dep:utoipa",
     "utoipa/axum_extras",
     "dep:utoipa-swagger-ui",
     "utoipa-swagger-ui/axum"
@@ -23,14 +25,11 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 connectify-config = { path = "../connectify_config" }
 connectify-common = { path = "../connectify_common" }
-connectify-db = { path = "../connectify_db", optional = true }
 tracing = { workspace = true }
 chrono = { workspace = true }
-sqlx = { version = "0.7", optional = true, features = ["sqlite", "any"] }
 
-# Firebase-specific dependencies
-reqwest = { workspace = true, features = ["json"] }
-yup-oauth2 = "8.3"  # Same as your Google Calendar integration
+# Database-specific dependencies
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "macros", "json", "chrono", "uuid", "sqlite", "any", "sqlite"] }
 
 # OpenAPI documentation
 utoipa = { workspace = true, optional = true }
@@ -38,7 +37,6 @@ utoipa-swagger-ui = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-wiremock = "0.5"
 
 [lints]
 workspace = true

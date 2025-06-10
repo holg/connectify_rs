@@ -1,0 +1,10 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 7c36c14be835a0f550582ddfb35b2bed37e45e9f068ac82076980ae297165559 # shrinks to start_offset_hours = 0, duration_days = 1, appointment_duration_minutes = 15, buffer_minutes = 0
+cc 9f80964ad54cef46fa8b08c1be0d10ccf4db05ecc225ed20a06da28e1aeab740 # shrinks to start_offset_hours = 0, duration_days = 1, appointment_duration_minutes = 15, busy_count = 1, max_busy_duration_hours = 1
+cc 114dd1bf17f60a0f385858c7559bac7387abde06323ce3f346081210309c7fbe # shrinks to start_offset_hours = 0, duration_days = 1, appointment_duration_minutes = 15, work_start_hour = 0, work_end_hour = 13, busy_count = 0, max_busy_duration_hours = 1
+cc c6ae30bb3a99aa263586f91c08c2f43d2d5e737603240a8df454269f9376e5bb # shrinks to start_offset_hours = 0, duration_days = 1, appointment_duration_minutes = 60, buffer_minutes = 1

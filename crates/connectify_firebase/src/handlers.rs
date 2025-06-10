@@ -14,7 +14,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use crate::client::{FcmMessage, FirebaseClient, FirebaseError, Message, Notification};
 
@@ -84,6 +84,85 @@ pub struct SendNotificationResponse {
     pub error: Option<String>,
 }
 
+/// Request body for registering a device
+///
+/// This struct represents the JSON payload that should be sent to the
+/// `/register-device` endpoint to register a device for push notifications.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct RegisterDeviceRequest {
+    /// The user ID to associate with the registration
+    pub user_id: String,
+
+    /// The device ID to associate with the registration
+    pub device_id: String,
+
+    /// The Firebase Cloud Messaging registration token
+    pub registration_token: String,
+}
+
+/// Response body for the register device endpoint
+///
+/// This struct represents the JSON response that is returned from the
+/// `/register-device` endpoint after attempting to register a device.
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct RegisterDeviceResponse {
+    /// Whether the device was registered successfully
+    pub success: bool,
+
+    /// The user ID associated with the registration
+    pub user_id: Option<String>,
+
+    /// The device ID associated with the registration
+    pub device_id: Option<String>,
+
+    /// Error message if registration failed
+    pub error: Option<String>,
+}
+
+/// Request body for sending a notification to a user
+///
+/// This struct represents the JSON payload that should be sent to the
+/// `/send-notification-to-user` endpoint to send a push notification to all
+/// devices registered for a user.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct SendNotificationToUserRequest {
+    /// The user ID to send notifications to
+    pub user_id: String,
+
+    /// The title of the notification
+    pub title: String,
+
+    /// The body text of the notification
+    pub body: String,
+
+    /// Custom key-value data to be sent with the message
+    pub data: Option<std::collections::HashMap<String, String>>,
+}
+
+/// Response body for the send notification to user endpoint
+///
+/// This struct represents the JSON response that is returned from the
+/// `/send-notification-to-user` endpoint after attempting to send push
+/// notifications to all devices registered for a user.
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct SendNotificationToUserResponse {
+    /// Whether the notifications were sent successfully
+    pub success: bool,
+
+    /// The number of devices that received the notification
+    pub device_count: usize,
+
+    /// The IDs of the messages if they were sent successfully
+    pub message_ids: Vec<String>,
+
+    /// Error message if sending notifications failed
+    pub error: Option<String>,
+}
+
 /// Handler for sending push notifications via Firebase Cloud Messaging
 ///
 /// This handler accepts a JSON payload with notification details and sends
@@ -102,6 +181,173 @@ pub struct SendNotificationResponse {
 /// - 401 Unauthorized: Authentication failed
 /// - 500 Internal Server Error: Server-side error
 ///
+/// Handler for registering a device for push notifications
+///
+/// This handler accepts a JSON payload with device registration details and
+/// stores the registration in the database.
+///
+/// # Request
+///
+/// The request must include a `user_id`, `device_id`, and `registration_token`.
+///
+/// # Responses
+///
+/// - 200 OK: Device registered successfully
+/// - 400 Bad Request: Missing or invalid parameters
+/// - 500 Internal Server Error: Server-side error
+///
+#[axum::debug_handler]
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/firebase/register-device",
+    request_body = RegisterDeviceRequest,
+    responses(
+        (status = 200, description = "Device registered successfully", body = RegisterDeviceResponse),
+        (status = 400, description = "Bad Request"),
+        (status = 500, description = "Internal Server Error")
+    ),
+    tag = "Firebase"
+))]
+pub async fn register_device_handler(
+    State(state): State<Arc<FirebaseState>>,
+    Json(payload): Json<RegisterDeviceRequest>,
+) -> Response {
+    debug!("Registering device for user: {}", payload.user_id);
+
+    match state
+        .client
+        .register_device(
+            payload.user_id.clone(),
+            payload.device_id.clone(),
+            payload.registration_token,
+        )
+        .await
+    {
+        Ok(registration) => {
+            info!(
+                "Successfully registered device for user: {}",
+                registration.user_id
+            );
+            Json(RegisterDeviceResponse {
+                success: true,
+                user_id: Some(registration.user_id),
+                device_id: Some(registration.device_id),
+                error: None,
+            })
+            .into_response()
+        }
+        Err(err) => {
+            error!("Failed to register device: {:?}", err);
+            let status = match &err {
+                FirebaseError::AuthError(_) => StatusCode::UNAUTHORIZED,
+                FirebaseError::ConfigError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+                FirebaseError::RequestError(_) => StatusCode::BAD_REQUEST,
+                FirebaseError::ApiError(_) => StatusCode::BAD_REQUEST,
+                #[cfg(feature = "database")]
+                FirebaseError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            };
+
+            (
+                status,
+                Json(RegisterDeviceResponse {
+                    success: false,
+                    user_id: Some(payload.user_id),
+                    device_id: Some(payload.device_id),
+                    error: Some(err.to_string()),
+                }),
+            )
+                .into_response()
+        }
+    }
+}
+
+/// Handler for sending push notifications to all devices registered for a user
+///
+/// This handler accepts a JSON payload with notification details and sends
+/// push notifications to all devices registered for the specified user.
+///
+/// # Request
+///
+/// The request must include a `user_id`, `title`, and `body` for the notification,
+/// and optionally can include custom `data`.
+///
+/// # Responses
+///
+/// - 200 OK: Notifications sent successfully
+/// - 400 Bad Request: Missing or invalid parameters
+/// - 401 Unauthorized: Authentication failed
+/// - 500 Internal Server Error: Server-side error
+///
+#[axum::debug_handler]
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/firebase/send-notification-to-user",
+    request_body = SendNotificationToUserRequest,
+    responses(
+        (status = 200, description = "Notifications sent successfully", body = SendNotificationToUserResponse),
+        (status = 400, description = "Bad Request"),
+        (status = 500, description = "Internal Server Error")
+    ),
+    tag = "Firebase"
+))]
+pub async fn send_notification_to_user_handler(
+    State(state): State<Arc<FirebaseState>>,
+    Json(payload): Json<SendNotificationToUserRequest>,
+) -> Response {
+    debug!(
+        "Sending notification to all devices for user: {}",
+        payload.user_id
+    );
+
+    let notification = Notification {
+        title: payload.title,
+        body: payload.body,
+    };
+
+    match state
+        .client
+        .send_notification_to_user(&payload.user_id, notification, payload.data)
+        .await
+    {
+        Ok(message_ids) => {
+            info!(
+                "Successfully sent notifications to {} devices for user: {}",
+                message_ids.len(),
+                payload.user_id
+            );
+
+            Json(SendNotificationToUserResponse {
+                success: true,
+                device_count: message_ids.len(),
+                message_ids,
+                error: None,
+            })
+            .into_response()
+        }
+        Err(err) => {
+            error!("Failed to send notifications to user: {:?}", err);
+            let status = match &err {
+                FirebaseError::AuthError(_) => StatusCode::UNAUTHORIZED,
+                FirebaseError::ConfigError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+                FirebaseError::RequestError(_) => StatusCode::BAD_REQUEST,
+                FirebaseError::ApiError(_) => StatusCode::BAD_REQUEST,
+                #[cfg(feature = "database")]
+                FirebaseError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            };
+
+            (
+                status,
+                Json(SendNotificationToUserResponse {
+                    success: false,
+                    device_count: 0,
+                    message_ids: Vec::new(),
+                    error: Some(err.to_string()),
+                }),
+            )
+                .into_response()
+        }
+    }
+}
 
 #[axum::debug_handler]
 #[cfg_attr(feature = "openapi", utoipa::path(
@@ -172,6 +418,8 @@ pub async fn send_notification_handler(
                 FirebaseError::ConfigError(_) => StatusCode::INTERNAL_SERVER_ERROR,
                 FirebaseError::RequestError(_) => StatusCode::BAD_REQUEST,
                 FirebaseError::ApiError(_) => StatusCode::BAD_REQUEST,
+                #[cfg(feature = "database")]
+                FirebaseError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             };
 
             (

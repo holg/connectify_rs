@@ -40,6 +40,7 @@ gcal_fulfillment = [
     "connectify-fulfillment/twilio"
 ]
 firebase = ["connectify-firebase", "connectify-firebase/openapi"]
+database = ["connectify-firebase/database", "connectify-db"]
 
 adhoc = ["connectify-adhoc", "connectify-adhoc/openapi", "connectify-adhoc/stripe", "connectify-adhoc/gcal", "connectify-fulfillment"]
 [dependencies]
@@ -59,6 +60,7 @@ connectify-stripe = { path = "../../connectify_stripe", optional = true }
 connectify-fulfillment = { path = "../../connectify_fulfillment",optional = true }
 connectify-adhoc = { path = "../../connectify_adhoc", optional = true }
 connectify-firebase = { path = "../../connectify_firebase", optional = true }
+connectify-db = { path = "../../connectify_db", optional = true, features = ["sqlite"] }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }
 utoipa = { workspace = true, optional = true }

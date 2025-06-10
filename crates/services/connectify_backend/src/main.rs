@@ -92,10 +92,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             #[cfg(feature = "gcal")]
             {
+                let gcal_state_option = app_state.gcal_state.clone();
                 info!("🔌 Merging GCal Fulfillment routes...");
                 api_router = api_router.merge(connectify_fulfillment::routes(
                     config.clone(),
-                    app_state.gcal_state.clone(),
+                    gcal_state_option,
                 ));
             }
         }
@@ -130,23 +131,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if is_feature_enabled(&config, config.use_firebase, config.firebase.as_ref()) {
             info!("🔌 Merging Firebase routes...");
             api_router = api_router.merge(connectify_firebase::routes(config.clone()));
-            // Adhoc routes take Arc<AppConfig> and potentially GcalState
-            #[cfg(not(feature = "firebase"))]
-            {
-                // When gcal feature is not enabled, call with just one argument
-                api_router = api_router.merge(connectify_adhoc::routes(config.clone()));
-            }
-            // // When both adhoc and gcal features are enabled, but not adhoc_gcal
-            // #[cfg(feature = "firebase")]
-            // {
-            //     info!("🔌 Merging GCal Adhoc routes...");
-            //     let gcal_hub_option = app_state
-            //         .gcal_state
-            //         .as_ref()
-            //         .map(|state| state.calendar_hub.clone());
-            //     api_router =
-            //         api_router.merge(connectify_adhoc::routes(config.clone(), gcal_hub_option));
-            // }
         }
     }
 
@@ -233,7 +217,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Starting server at http://{}", addr);
     info!("API endpoints available at http://{}/api", addr);
     #[cfg(feature = "openapi")]
-    info!("Swgger UI available at http://{}/admin/api/docs", addr);
+    info!("Swagger UI available at http://{}/admin/api/docs", addr);
+    #[cfg(feature = "database")]
+    info!("Database feature available");
 
     axum::serve(listener, app.into_make_service()).await?;
     Ok(())

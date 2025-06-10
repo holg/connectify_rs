@@ -9,7 +9,7 @@ use_gcal: true
 use_adhoc_session: true
 
 database:
-  url: sqlite://example.db
+  url: sqlite:example.db
 
 twilio:
   account_sid: "secret_from_env"

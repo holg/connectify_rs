@@ -465,7 +465,19 @@ impl ConnectifyServiceFactory {
         {
             if is_feature_enabled(&config, config.use_firebase, config.firebase.as_ref()) {
                 info!("ℹ️ Initializing Firebase service factory...");
-                let firebase_factory = FirebaseServiceFactory::new(config.clone());
+                let mut firebase_factory = FirebaseServiceFactory::new(config.clone());
+
+                // Initialize the database if the database feature is enabled
+                #[cfg(feature = "database")]
+                {
+                    info!("ℹ️ Initializing Firebase database...");
+                    if let Err(e) = firebase_factory.init_db().await {
+                        error!("🚨 Failed to initialize Firebase database: {}", e);
+                    } else {
+                        info!("✅ Firebase database initialized.");
+                    }
+                }
+
                 factory.firebase_service_factory = Some(Arc::new(firebase_factory));
                 info!("✅ Firebase service factory initialized.");
             }
